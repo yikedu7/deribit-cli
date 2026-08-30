@@ -5,3 +5,25 @@ target/
 .env.*
 *.pem
 *.key
+*.p12
+*.pfx
+
+# Internal-only project material. These paths are also rejected by the
+# publication boundary checks if they are ever force-added or merged.
+/.agents/
+/.codex/
+/AGENTS.md
+/CONTEXT.md
+/ci/
+/docs/
+/internal/
+/release/
+/tests/common/fixtures.rs
+/tests/contract.rs
+/tests/contract/
+/tests/fixtures/
+/tests/golden/
+/tests/release.rs
+/tests/release/
+/tests/table.rs
+/tests/unit/
