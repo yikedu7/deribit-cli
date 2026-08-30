@@ -1,0 +1,465 @@
+{
+  "manifest_id": "api-method-manifest-v1",
+  "schema_version": "1.0.0",
+  "status": "frozen",
+  "snapshot": {
+    "snapshot_id": "deribit-api-v2-mainnet-2026-08-30",
+    "source_file": "docs/api-snapshot-v1.md",
+    "source_sha256": "421e1ca06f18d2ad7882aaf4369763a58c3a9629dee62f2173cef57f0c855dc0",
+    "official_openapi_url": "https://docs.deribit.com/specifications/deribit_openapi.json",
+    "official_openapi_sha256": "9375d9a18543be88b33b751e600911d529ce331cf0a421b28b0673121f8e4f8d",
+    "official_index_url": "https://docs.deribit.com/llms.txt",
+    "official_index_sha256": "6d70e8cbaeb34e698b559e55eeb10182a0c790d9d10442f014a9f479c06e626c",
+    "retrieved_on": "2026-08-28",
+    "api_version": "2.1.1"
+  },
+  "policy": {
+    "namespace": "public",
+    "auth_required": false,
+    "read_only": true,
+    "websocket_only": false,
+    "streaming": false,
+    "side_effect": "none",
+    "official_transport": "HTTP GET with JSON-RPC 2.0",
+    "implementation_transport": "HTTP POST with JSON-RPC 2.0 named params",
+    "implicit_retry": false,
+    "implicit_redirect": false,
+    "implicit_pagination": false,
+    "one_request_per_operation": true
+  },
+  "methods": [
+    {
+      "method": "public/get_time", "operation_id": "public_get_time", "canonical_command": "public get-time", "command_tokens": ["public", "get-time"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [],
+      "presentation": {"table_profile_id": "supporting", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/supporting/public-get_time", "openapi_pointer": "paths./public/get_time.get", "snapshot_section": "4.1"}, "evidence_notes": []
+    },
+    {
+      "method": "public/status", "operation_id": "public_status", "canonical_command": "public status", "command_tokens": ["public", "status"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [],
+      "presentation": {"table_profile_id": "supporting", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/supporting/public-status", "openapi_pointer": "paths./public/status.get", "snapshot_section": "4.1"}, "evidence_notes": ["Official response documentation describes locked as string while the example uses boolean; response is native JSON and this does not change the request schema."]
+    },
+    {
+      "method": "public/test", "operation_id": "public_test", "canonical_command": "public test", "command_tokens": ["public", "test"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "expected_result", "flag": "--expected-result", "required": false, "type": "string", "enum": ["exception"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "none", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/supporting/public-test", "location": "Query Parameters: expected_result", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "supporting", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/supporting/public-test", "openapi_pointer": "paths./public/test.get", "snapshot_section": "4.1"}, "evidence_notes": ["expected_result=exception deliberately requests the documented API-native test error; it has no trading or account side effect."]
+    },
+    {
+      "method": "public/get_announcements", "operation_id": "public_get_announcements", "canonical_command": "public get-announcements", "command_tokens": ["public", "get-announcements"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "start_timestamp", "flag": "--start-timestamp", "required": false, "type": "integer", "enum": [], "default": {"kind": "dynamic", "description": "server current time", "unit": "milliseconds_since_unix_epoch"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/account-management/public-get_announcements", "location": "Query Parameters: start_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "count", "flag": "--count", "required": false, "type": "integer", "enum": [], "default": {"kind": "literal", "value": 5}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "count", "constraints": {"minimum": 1, "maximum": 50}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/account-management/public-get_announcements", "location": "Query Parameters: count", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "announcement", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/account-management/public-get_announcements", "openapi_pointer": "paths./public/get_announcements.get", "snapshot_section": "4.2"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_currencies", "operation_id": "public_get_currencies", "canonical_command": "public get-currencies", "command_tokens": ["public", "get-currencies"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [],
+      "presentation": {"table_profile_id": "supporting", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_currencies", "openapi_pointer": "paths./public/get_currencies.get", "snapshot_section": "4.3"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_contract_size", "operation_id": "public_get_contract_size", "canonical_command": "public get-contract-size", "command_tokens": ["public", "get-contract-size"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_contract_size", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "supporting", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_contract_size", "openapi_pointer": "paths./public/get_contract_size.get", "snapshot_section": "4.3"}, "evidence_notes": ["The generated cURL example omits the parameter while the query-parameter schema marks it required; the frozen snapshot assigns parameter authority to the OpenAPI GET operation."]
+    },
+    {
+      "method": "public/get_expirations", "operation_id": "public_get_expirations", "canonical_command": "public get-expirations", "command_tokens": ["public", "get-expirations"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "any", "grouped"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code_or_group", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_expirations", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "kind", "flag": "--kind", "required": true, "type": "string", "enum": ["future", "option", "any"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_kind", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_expirations", "location": "Query Parameters: kind", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "currency_pair", "flag": "--currency-pair", "required": false, "type": "string", "enum": ["btc_usd", "eth_usd", "ada_usdc", "algo_usdc", "avax_usdc", "bch_usdc", "bnb_usdc", "btc_usdc", "btcdvol_usdc", "buidl_usdc", "doge_usdc", "dot_usdc", "eurr_usdc", "eth_usdc", "ethdvol_usdc", "hype_usdc", "link_usdc", "ltc_usdc", "near_usdc", "paxg_usdc", "shib_usdc", "sol_usdc", "steth_usdc", "ton_usdc", "trump_usdc", "trx_usdc", "uni_usdc", "usde_usdc", "usyc_usdc", "xrp_usdc", "btc_usdt", "eth_usdt", "eurr_usdt", "sol_usdt", "steth_usdt", "usdc_usdt", "usde_usdt", "btc_eurr", "btc_usde", "btc_usyc", "eth_btc", "eth_eurr", "eth_usde", "eth_usyc", "steth_eth", "paxg_btc", "drbfix-btc_usdc", "drbfix-eth_usdc"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "currency_pair", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_expirations", "location": "Query Parameters: currency_pair", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "supporting", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_expirations", "openapi_pointer": "paths./public/get_expirations.get", "snapshot_section": "4.3"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_index_price_names", "operation_id": "public_get_index_price_names", "canonical_command": "public get-index-price-names", "command_tokens": ["public", "get-index-price-names"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "extended", "flag": "--extended", "required": false, "type": "boolean", "enum": [], "default": {"kind": "literal", "value": false}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "none", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_index_price_names", "location": "Query Parameters: extended", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "supporting", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_index_price_names", "openapi_pointer": "paths./public/get_index_price_names.get", "snapshot_section": "4.3"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_supported_index_names", "operation_id": "public_get_supported_index_names", "canonical_command": "public get-supported-index-names", "command_tokens": ["public", "get-supported-index-names"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "type", "flag": "--type", "required": false, "type": "string", "enum": ["all", "spot", "derivative"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "index_type", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_supported_index_names", "location": "Query Parameters: type", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "supporting", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_supported_index_names", "openapi_pointer": "paths./public/get_supported_index_names.get", "snapshot_section": "4.3"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_instrument", "operation_id": "public_get_instrument", "canonical_command": "public get-instrument", "command_tokens": ["public", "get-instrument"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_instrument", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_instrument", "openapi_pointer": "paths./public/get_instrument.get", "snapshot_section": "4.3"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_instruments", "operation_id": "public_get_instruments", "canonical_command": "public get-instruments", "command_tokens": ["public", "get-instruments"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "EURR", "any"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code_or_any", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_instruments", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "kind", "flag": "--kind", "required": false, "type": "string", "enum": ["future", "option", "spot", "future_combo", "option_combo"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "instrument_kind", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_instruments", "location": "Query Parameters: kind", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "expired", "flag": "--expired", "required": false, "type": "boolean", "enum": [], "default": {"kind": "literal", "value": false}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "none", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_instruments", "location": "Query Parameters: expired", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "instruments", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_instruments", "openapi_pointer": "paths./public/get_instruments.get", "snapshot_section": "4.3"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_order_book", "operation_id": "public_get_order_book", "canonical_command": "public get-order-book", "command_tokens": ["public", "get-order-book"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_order_book", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "depth", "flag": "--depth", "required": false, "type": "integer", "enum": [1, 5, 10, 20, 50, 100, 1000, 10000], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "order_book_levels", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_order_book", "location": "Query Parameters: depth", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "order_book", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_order_book", "openapi_pointer": "paths./public/get_order_book.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_order_book_by_instrument_id", "operation_id": "public_get_order_book_by_instrument_id", "canonical_command": "public get-order-book-by-instrument-id", "command_tokens": ["public", "get-order-book-by-instrument-id"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_id", "flag": "--instrument-id", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_id", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_order_book_by_instrument_id", "location": "Query Parameters: instrument_id", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "depth", "flag": "--depth", "required": false, "type": "integer", "enum": [1, 5, 10, 20, 50, 100, 1000, 10000], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "order_book_levels", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_order_book_by_instrument_id", "location": "Query Parameters: depth", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "order_book", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_order_book_by_instrument_id", "openapi_pointer": "paths./public/get_order_book_by_instrument_id.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_book_summary_by_currency", "operation_id": "public_get_book_summary_by_currency", "canonical_command": "public get-book-summary-by-currency", "command_tokens": ["public", "get-book-summary-by-currency"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "EURR"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_book_summary_by_currency", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "kind", "flag": "--kind", "required": false, "type": "string", "enum": ["future", "option", "spot", "future_combo", "option_combo"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "instrument_kind", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_book_summary_by_currency", "location": "Query Parameters: kind", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_book_summary_by_currency", "openapi_pointer": "paths./public/get_book_summary_by_currency.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_book_summary_by_instrument", "operation_id": "public_get_book_summary_by_instrument", "canonical_command": "public get-book-summary-by-instrument", "command_tokens": ["public", "get-book-summary-by-instrument"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_book_summary_by_instrument", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_book_summary_by_instrument", "openapi_pointer": "paths./public/get_book_summary_by_instrument.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_index_price", "operation_id": "public_get_index_price", "canonical_command": "public get-index-price", "command_tokens": ["public", "get-index-price"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "index_name", "flag": "--index-name", "required": true, "type": "string", "enum": ["btc_usd", "eth_usd", "ada_usdc", "algo_usdc", "avax_usdc", "bch_usdc", "bnb_usdc", "btc_usdc", "btcdvol_usdc", "buidl_usdc", "doge_usdc", "dot_usdc", "eurr_usdc", "eth_usdc", "ethdvol_usdc", "hype_usdc", "link_usdc", "ltc_usdc", "near_usdc", "paxg_usdc", "shib_usdc", "sol_usdc", "steth_usdc", "ton_usdc", "trump_usdc", "trx_usdc", "uni_usdc", "usde_usdc", "usyc_usdc", "xrp_usdc", "btc_usdt", "eth_usdt", "eurr_usdt", "sol_usdt", "steth_usdt", "usdc_usdt", "usde_usdt", "btc_eurr", "btc_usde", "btc_usyc", "eth_btc", "eth_eurr", "eth_usde", "eth_usyc", "steth_eth", "paxg_btc", "drbfix-btc_usdc", "drbfix-eth_usdc"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "index_name", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_index_price", "location": "Query Parameters: index_name", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "index", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_index_price", "openapi_pointer": "paths./public/get_index_price.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_last_trades_by_currency", "operation_id": "public_get_last_trades_by_currency", "canonical_command": "public get-last-trades-by-currency", "command_tokens": ["public", "get-last-trades-by-currency"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "EURR"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "kind", "flag": "--kind", "required": false, "type": "string", "enum": ["future", "option", "spot", "future_combo", "option_combo", "combo", "any"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "instrument_kind", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency", "location": "Query Parameters: kind", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_id", "flag": "--start-id", "required": false, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "trade_id", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency", "location": "Query Parameters: start_id", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_id", "flag": "--end-id", "required": false, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "trade_id", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency", "location": "Query Parameters: end_id", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_timestamp", "flag": "--start-timestamp", "required": false, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency", "location": "Query Parameters: start_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_timestamp", "flag": "--end-timestamp", "required": false, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency", "location": "Query Parameters: end_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "count", "flag": "--count", "required": false, "type": "integer", "enum": [], "default": {"kind": "literal", "value": 10}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "count", "constraints": {"minimum": 1, "maximum": 1000}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency", "location": "Query Parameters: count", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "sorting", "flag": "--sorting", "required": false, "type": "string", "enum": ["asc", "desc", "default"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "sort_order", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency", "location": "Query Parameters: sorting", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency", "openapi_pointer": "paths./public/get_last_trades_by_currency.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_last_trades_by_currency_and_time", "operation_id": "public_get_last_trades_by_currency_and_time", "canonical_command": "public get-last-trades-by-currency-and-time", "command_tokens": ["public", "get-last-trades-by-currency-and-time"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "EURR"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency_and_time", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "kind", "flag": "--kind", "required": false, "type": "string", "enum": ["future", "option", "spot", "future_combo", "option_combo", "combo", "any"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "instrument_kind", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency_and_time", "location": "Query Parameters: kind", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_timestamp", "flag": "--start-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency_and_time", "location": "Query Parameters: start_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_timestamp", "flag": "--end-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency_and_time", "location": "Query Parameters: end_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "count", "flag": "--count", "required": false, "type": "integer", "enum": [], "default": {"kind": "literal", "value": 10}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "count", "constraints": {"minimum": 1, "maximum": 1000}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency_and_time", "location": "Query Parameters: count", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "sorting", "flag": "--sorting", "required": false, "type": "string", "enum": ["asc", "desc", "default"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "sort_order", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency_and_time", "location": "Query Parameters: sorting", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_currency_and_time", "openapi_pointer": "paths./public/get_last_trades_by_currency_and_time.get", "snapshot_section": "4.4"}, "evidence_notes": ["The method page includes a trade:read scope label, while the frozen snapshot records the OpenAPI operation without security and an unauthenticated official probe; this is retained as an evidence note, not an auth requirement."]
+    },
+    {
+      "method": "public/get_last_trades_by_instrument", "operation_id": "public_get_last_trades_by_instrument", "canonical_command": "public get-last-trades-by-instrument", "command_tokens": ["public", "get-last-trades-by-instrument"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_seq", "flag": "--start-seq", "required": false, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "trade_sequence", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument", "location": "Query Parameters: start_seq", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_seq", "flag": "--end-seq", "required": false, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "trade_sequence", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument", "location": "Query Parameters: end_seq", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_timestamp", "flag": "--start-timestamp", "required": false, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument", "location": "Query Parameters: start_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_timestamp", "flag": "--end-timestamp", "required": false, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument", "location": "Query Parameters: end_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "count", "flag": "--count", "required": false, "type": "integer", "enum": [], "default": {"kind": "literal", "value": 10}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "count", "constraints": {"minimum": 1, "maximum": 1000}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument", "location": "Query Parameters: count", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "sorting", "flag": "--sorting", "required": false, "type": "string", "enum": ["asc", "desc", "default"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "sort_order", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument", "location": "Query Parameters: sorting", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument", "openapi_pointer": "paths./public/get_last_trades_by_instrument.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_last_trades_by_instrument_and_time", "operation_id": "public_get_last_trades_by_instrument_and_time", "canonical_command": "public get-last-trades-by-instrument-and-time", "command_tokens": ["public", "get-last-trades-by-instrument-and-time"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument_and_time", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_timestamp", "flag": "--start-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument_and_time", "location": "Query Parameters: start_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_timestamp", "flag": "--end-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument_and_time", "location": "Query Parameters: end_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "count", "flag": "--count", "required": false, "type": "integer", "enum": [], "default": {"kind": "literal", "value": 10}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "count", "constraints": {"minimum": 1, "maximum": 1000}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument_and_time", "location": "Query Parameters: count", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "sorting", "flag": "--sorting", "required": false, "type": "string", "enum": ["asc", "desc", "default"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "sort_order", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument_and_time", "location": "Query Parameters: sorting", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_trades_by_instrument_and_time", "openapi_pointer": "paths./public/get_last_trades_by_instrument_and_time.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_last_settlements_by_currency", "operation_id": "public_get_last_settlements_by_currency", "canonical_command": "public get-last-settlements-by-currency", "command_tokens": ["public", "get-last-settlements-by-currency"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "explicit", "implicit": false, "parameters": ["continuation", "count"]}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "EURR"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_currency", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "type", "flag": "--type", "required": false, "type": "string", "enum": ["settlement", "delivery", "bankruptcy"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "settlement_event_type", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_currency", "location": "Query Parameters: type", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "count", "flag": "--count", "required": false, "type": "integer", "enum": [], "default": {"kind": "literal", "value": 20}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "count", "constraints": {"minimum": 1, "maximum": 1000}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_currency", "location": "Query Parameters: count", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "continuation", "flag": "--continuation", "required": false, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "continuation_token", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_currency", "location": "Query Parameters: continuation", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "search_start_timestamp", "flag": "--search-start-timestamp", "required": false, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_currency", "location": "Query Parameters: search_start_timestamp", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_currency", "openapi_pointer": "paths./public/get_last_settlements_by_currency.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_last_settlements_by_instrument", "operation_id": "public_get_last_settlements_by_instrument", "canonical_command": "public get-last-settlements-by-instrument", "command_tokens": ["public", "get-last-settlements-by-instrument"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "explicit", "implicit": false, "parameters": ["continuation", "count"]}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_instrument", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "type", "flag": "--type", "required": false, "type": "string", "enum": ["settlement", "delivery", "bankruptcy"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "settlement_event_type", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_instrument", "location": "Query Parameters: type", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "count", "flag": "--count", "required": false, "type": "integer", "enum": [], "default": {"kind": "literal", "value": 20}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "count", "constraints": {"minimum": 1, "maximum": 1000}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_instrument", "location": "Query Parameters: count", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "continuation", "flag": "--continuation", "required": false, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "continuation_token", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_instrument", "location": "Query Parameters: continuation", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "search_start_timestamp", "flag": "--search-start-timestamp", "required": false, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_instrument", "location": "Query Parameters: search_start_timestamp", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_last_settlements_by_instrument", "openapi_pointer": "paths./public/get_last_settlements_by_instrument.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_delivery_prices", "operation_id": "public_get_delivery_prices", "canonical_command": "public get-delivery-prices", "command_tokens": ["public", "get-delivery-prices"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "explicit", "implicit": false, "parameters": ["offset", "count"]}, "parameters": [
+        {"name": "index_name", "flag": "--index-name", "required": true, "type": "string", "enum": ["btc_usd", "eth_usd", "ada_usdc", "algo_usdc", "avax_usdc", "bch_usdc", "bnb_usdc", "btc_usdc", "btcdvol_usdc", "buidl_usdc", "doge_usdc", "dot_usdc", "eurr_usdc", "eth_usdc", "ethdvol_usdc", "hype_usdc", "link_usdc", "ltc_usdc", "near_usdc", "paxg_usdc", "shib_usdc", "sol_usdc", "steth_usdc", "ton_usdc", "trump_usdc", "trx_usdc", "uni_usdc", "usde_usdc", "usyc_usdc", "xrp_usdc", "btc_usdt", "eth_usdt", "eurr_usdt", "sol_usdt", "steth_usdt", "usdc_usdt", "usde_usdt", "btc_eurr", "btc_usde", "btc_usyc", "eth_btc", "eth_eurr", "eth_usde", "eth_usyc", "steth_eth", "paxg_btc", "drbfix-btc_usdc", "drbfix-eth_usdc"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "index_name", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_delivery_prices", "location": "Query Parameters: index_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "offset", "flag": "--offset", "required": false, "type": "integer", "enum": [], "default": {"kind": "literal", "value": 0}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "records", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_delivery_prices", "location": "Query Parameters: offset", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "count", "flag": "--count", "required": false, "type": "integer", "enum": [], "default": {"kind": "literal", "value": 10}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "count", "constraints": {"minimum": 1, "maximum": 1000}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_delivery_prices", "location": "Query Parameters: count", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_delivery_prices", "openapi_pointer": "paths./public/get_delivery_prices.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_trade_volumes", "operation_id": "public_get_trade_volumes", "canonical_command": "public get-trade-volumes", "command_tokens": ["public", "get-trade-volumes"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "extended", "flag": "--extended", "required": false, "type": "boolean", "enum": [], "default": {"kind": "literal", "value": false}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "none", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_trade_volumes", "location": "Query Parameters: extended", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_trade_volumes", "openapi_pointer": "paths./public/get_trade_volumes.get", "snapshot_section": "4.4"}, "evidence_notes": ["The official method description states that extended defaults to false; the client still omits an absent key and delegates the server default."]
+    },
+    {
+      "method": "public/get_tradingview_chart_data", "operation_id": "public_get_tradingview_chart_data", "canonical_command": "public get-tradingview-chart-data", "command_tokens": ["public", "get-tradingview-chart-data"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_tradingview_chart_data", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_timestamp", "flag": "--start-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_tradingview_chart_data", "location": "Query Parameters: start_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_timestamp", "flag": "--end-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_tradingview_chart_data", "location": "Query Parameters: end_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "resolution", "flag": "--resolution", "required": true, "type": "string", "enum": ["1", "3", "5", "10", "15", "30", "60", "120", "180", "360", "720", "1D"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "resolution_minutes_or_1D", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_tradingview_chart_data", "location": "Query Parameters: resolution", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_tradingview_chart_data", "openapi_pointer": "paths./public/get_tradingview_chart_data.get", "snapshot_section": "4.4"}, "evidence_notes": ["The parameter name is resolution; the official description also mentions chart_resolution. The frozen snapshot treats resolution as authoritative."]
+    },
+    {
+      "method": "public/get_index_chart_data", "operation_id": "public_get_index_chart_data", "canonical_command": "public get-index-chart-data", "command_tokens": ["public", "get-index-chart-data"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "index_name", "flag": "--index-name", "required": true, "type": "string", "enum": ["btc_usd", "eth_usd", "ada_usdc", "algo_usdc", "avax_usdc", "bch_usdc", "bnb_usdc", "btc_usdc", "btcdvol_usdc", "buidl_usdc", "doge_usdc", "dot_usdc", "eurr_usdc", "eth_usdc", "ethdvol_usdc", "hype_usdc", "link_usdc", "ltc_usdc", "near_usdc", "paxg_usdc", "shib_usdc", "sol_usdc", "steth_usdc", "ton_usdc", "trump_usdc", "trx_usdc", "uni_usdc", "usde_usdc", "usyc_usdc", "xrp_usdc", "btc_usdt", "eth_usdt", "eurr_usdt", "sol_usdt", "steth_usdt", "usdc_usdt", "usde_usdt", "btc_eurr", "btc_usde", "btc_usyc", "eth_btc", "eth_eurr", "eth_usde", "eth_usyc", "steth_eth", "paxg_btc", "drbfix-btc_usdc", "drbfix-eth_usdc"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "index_name", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_index_chart_data", "location": "Query Parameters: index_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "range", "flag": "--range", "required": true, "type": "string", "enum": ["1h", "1d", "2d", "1m", "1y", "all"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "time_window", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_index_chart_data", "location": "Query Parameters: range", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_index_chart_data", "openapi_pointer": "paths./public/get_index_chart_data.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_mark_price_history", "operation_id": "public_get_mark_price_history", "canonical_command": "public get-mark-price-history", "command_tokens": ["public", "get-mark-price-history"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_mark_price_history", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_timestamp", "flag": "--start-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_mark_price_history", "location": "Query Parameters: start_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_timestamp", "flag": "--end-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_mark_price_history", "location": "Query Parameters: end_timestamp", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_mark_price_history", "openapi_pointer": "paths./public/get_mark_price_history.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/ticker", "operation_id": "public_ticker", "canonical_command": "public ticker", "command_tokens": ["public", "ticker"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-ticker", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "ticker", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-ticker", "openapi_pointer": "paths./public/ticker.get", "snapshot_section": "4.4"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_historical_volatility", "operation_id": "public_get_historical_volatility", "canonical_command": "public get-historical-volatility", "command_tokens": ["public", "get-historical-volatility"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "EURR"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_historical_volatility", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "volatility", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_historical_volatility", "openapi_pointer": "paths./public/get_historical_volatility.get", "snapshot_section": "4.5"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_volatility_index_data", "operation_id": "public_get_volatility_index_data", "canonical_command": "public get-volatility-index-data", "command_tokens": ["public", "get-volatility-index-data"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "EURR"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_volatility_index_data", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_timestamp", "flag": "--start-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_volatility_index_data", "location": "Query Parameters: start_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_timestamp", "flag": "--end-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_volatility_index_data", "location": "Query Parameters: end_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "resolution", "flag": "--resolution", "required": true, "type": "string", "enum": ["1", "60", "3600", "43200", "1D"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "resolution_seconds_or_1D", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_volatility_index_data", "location": "Query Parameters: resolution", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "volatility", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_volatility_index_data", "openapi_pointer": "paths./public/get_volatility_index_data.get", "snapshot_section": "4.5"}, "evidence_notes": ["The parameter name is resolution; the official description also mentions vix_resolution. The frozen snapshot treats resolution as authoritative."]
+    },
+    {
+      "method": "public/get_funding_chart_data", "operation_id": "public_get_funding_chart_data", "canonical_command": "public get-funding-chart-data", "command_tokens": ["public", "get-funding-chart-data"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_chart_data", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "length", "flag": "--length", "required": true, "type": "string", "enum": ["8h", "24h", "1m"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "time_window", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_chart_data", "location": "Query Parameters: length", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "funding", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_chart_data", "openapi_pointer": "paths./public/get_funding_chart_data.get", "snapshot_section": "4.6"}, "evidence_notes": ["The current official method page specifies length as enum<string> with 8h, 24h and 1m; the frozen snapshot only recorded the parameter name and requiredness, so this execution schema is completed from the official page."]
+    },
+    {
+      "method": "public/get_funding_rate_history", "operation_id": "public_get_funding_rate_history", "canonical_command": "public get-funding-rate-history", "command_tokens": ["public", "get-funding-rate-history"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_rate_history", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_timestamp", "flag": "--start-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_rate_history", "location": "Query Parameters: start_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_timestamp", "flag": "--end-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_rate_history", "location": "Query Parameters: end_timestamp", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "funding", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_rate_history", "openapi_pointer": "paths./public/get_funding_rate_history.get", "snapshot_section": "4.6"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_funding_rate_value", "operation_id": "public_get_funding_rate_value", "canonical_command": "public get-funding-rate-value", "command_tokens": ["public", "get-funding-rate-value"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "instrument_name", "flag": "--instrument-name", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "instrument_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_rate_value", "location": "Query Parameters: instrument_name", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "start_timestamp", "flag": "--start-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_rate_value", "location": "Query Parameters: start_timestamp", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "end_timestamp", "flag": "--end-timestamp", "required": true, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "milliseconds_since_unix_epoch", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_rate_value", "location": "Query Parameters: end_timestamp", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "funding", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_funding_rate_value", "openapi_pointer": "paths./public/get_funding_rate_value.get", "snapshot_section": "4.6"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_combos", "operation_id": "public_get_combos", "canonical_command": "public get-combos", "command_tokens": ["public", "get-combos"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "EURR", "any"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code_or_any", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/combo-books/public-get_combos", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "combo", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/combo-books/public-get_combos", "openapi_pointer": "paths./public/get_combos.get", "snapshot_section": "4.7"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_combo_ids", "operation_id": "public_get_combo_ids", "canonical_command": "public get-combo-ids", "command_tokens": ["public", "get-combo-ids"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "EURR"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/combo-books/public-get_combo_ids", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "state", "flag": "--state", "required": false, "type": "string", "enum": ["active", "inactive"], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "combo_state", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/combo-books/public-get_combo_ids", "location": "Query Parameters: state", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/combo-books/public-get_combo_ids", "openapi_pointer": "paths./public/get_combo_ids.get", "snapshot_section": "4.7"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_combo_details", "operation_id": "public_get_combo_details", "canonical_command": "public get-combo-details", "command_tokens": ["public", "get-combo-details"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "none", "implicit": false, "parameters": []}, "parameters": [
+        {"name": "combo_id", "flag": "--combo-id", "required": true, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "combo_identifier", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/combo-books/public-get_combo_details", "location": "Query Parameters: combo_id", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": "combo", "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/combo-books/public-get_combo_details", "openapi_pointer": "paths./public/get_combo_details.get", "snapshot_section": "4.7"}, "evidence_notes": []
+    },
+    {
+      "method": "public/get_block_rfq_trades", "operation_id": "public_get_block_rfq_trades", "canonical_command": "public get-block-rfq-trades", "command_tokens": ["public", "get-block-rfq-trades"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "explicit", "implicit": false, "parameters": ["continuation", "count"]}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["BTC", "ETH", "USDC", "USDT", "EURR", "any"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "currency_code_or_any", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/block-rfq/public-get_block_rfq_trades", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "continuation", "flag": "--continuation", "required": false, "type": "string", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "continuation_token", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/block-rfq/public-get_block_rfq_trades", "location": "Query Parameters: continuation", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "count", "flag": "--count", "required": false, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "count", "constraints": {"minimum": 10, "maximum": 50}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/block-rfq/public-get_block_rfq_trades", "location": "Query Parameters: count; Mainnet runtime contract observed 2026-08-30", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/block-rfq/public-get_block_rfq_trades", "openapi_pointer": "paths./public/get_block_rfq_trades.get", "snapshot_section": "4.8"}, "evidence_notes": ["The official current page still states count 1..1000, but Mainnet and Testnet returned -32602 with the enforced range 10..50 on 2026-08-30. Owner approved Mainnet runtime behavior as the active v1 parameter contract."]
+    },
+    {
+      "method": "public/get_apr_history", "operation_id": "public_get_apr_history", "canonical_command": "public get-apr-history", "command_tokens": ["public", "get-apr-history"],
+      "transport": {"official_http_method": "GET", "implementation_http_method": "POST", "path": "/api/v2", "jsonrpc": "2.0", "request_shape": "named_params"},
+      "interaction": "finite_request_response", "auth_required": false, "read_only": true, "streaming": false, "side_effect": "none",
+      "pagination": {"mode": "explicit", "implicit": false, "parameters": ["before", "limit"]}, "parameters": [
+        {"name": "currency", "flag": "--currency", "required": true, "type": "string", "enum": ["usde", "steth", "usdc", "build"], "default": {"kind": "not_declared"}, "cli_behavior": "must_supply", "nullable": false, "unit": "yield_token", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_apr_history", "location": "Query Parameters: currency", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "limit", "flag": "--limit", "required": false, "type": "integer", "enum": [], "default": {"kind": "literal", "value": 365}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "days", "constraints": {"maximum": 365}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_apr_history", "location": "Query Parameters: limit", "authority": "official method page and frozen OpenAPI operation"}},
+        {"name": "before", "flag": "--before", "required": false, "type": "integer", "enum": [], "default": {"kind": "not_declared"}, "cli_behavior": "omit_when_absent", "nullable": false, "unit": "epoch_day", "constraints": {}, "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_apr_history", "location": "Query Parameters: before", "authority": "official method page and frozen OpenAPI operation"}}
+      ],
+      "presentation": {"table_profile_id": null, "json_only": false},
+      "source": {"official_method_page": "https://docs.deribit.com/api-reference/market-data/public-get_apr_history", "openapi_pointer": "paths./public/get_apr_history.get", "snapshot_section": "4.9"}, "evidence_notes": ["before is an epoch day, not a millisecond timestamp; limit defaults to 365 and has an official maximum of 365."]
+    }
+  ]
+}

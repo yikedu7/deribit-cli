@@ -16,6 +16,20 @@ Supported release targets:
 
 Use the attached `SHA256SUMS` file to verify the download.
 
+## Build from source
+
+Rust 1.85 or newer is required.
+
+```sh
+cargo build --release --locked
+```
+
+The repository contains the product unit tests plus public CLI, manifest-correspondence, and read-only security tests:
+
+```sh
+cargo test --locked --all-targets
+```
+
 ## Quick start
 
 ```sh
