@@ -1,22 +1,22 @@
-# Agent 组合期权查询
+# Agent Combined Option Queries
 
-本文件提供可改写的 Bash + jq 样例，不安装分析程序，不增加 Rust CLI 命令。Agent 负责选择输入、调度请求、检查结果和解释数据。`jq` 不可用时可用已有工具实现相同流程。
+This file provides adaptable Bash + jq examples. These examples do not install a separate analysis program or add Rust CLI commands. The Agent selects inputs, schedules requests, checks results, and interprets data. If `jq` is unavailable, use existing tools to implement the same workflow.
 
-## 先确定合约集合
+## First Determine the Instrument Set
 
-用 `get-instruments` 获取元数据；API `currency` 是查询分组，不一定等于用户所说的标的。不确定时用 `--currency any --kind option --expired false`，再看 `base_currency`、`quote_currency`、`settlement_currency` 和 `instrument_name`。同一标的有多种产品时明确选择产品范围，不能默默混合结算币种。
+Use `get-instruments` to obtain metadata; the API `currency` is a query group and may not equal the underlying named by the user. When uncertain, use `--currency any --kind option --expired false`, then inspect `base_currency`, `quote_currency`, `settlement_currency`, and `instrument_name`. When the same underlying has multiple products, explicitly choose the product scope and do not silently mix settlement currencies.
 
-把成功响应保存为 `instruments.json` 后，可先列出元数据中的到期时间（下例只读取文件，不请求 API）：
+After saving the successful response as `instruments.json`, first list the expiration times in the metadata (the example below reads only the file and makes no API request):
 
 ```sh
 jq '[.result[] | {base_currency, quote_currency, settlement_currency, expiration_timestamp, expiration_utc: (.expiration_timestamp / 1000 | todateiso8601)}] | unique' instruments.json
 ```
 
-确认用户指定日期对应哪个 `expiration_timestamp`；有多个匹配时先消除歧义，不四舍五入到最近一日。用于采集的参数：`DERIBIT_CURRENCY`（帮助允许的 API 分组，可为 `any`）、`DERIBIT_BASE`、`DERIBIT_QUOTE`、`DERIBIT_SETTLEMENT`、`DERIBIT_EXPIRY_MS`（精确毫秒）、`DERIBIT_SIDE`（`call`/`put`/`both`，默认 `both`）。
+Confirm which `expiration_timestamp` corresponds to the user's specified date; resolve ambiguity first when there are multiple matches, and do not round to the nearest day. Collection parameters: `DERIBIT_CURRENCY` (an API group permitted by help, possibly `any`), `DERIBIT_BASE`, `DERIBIT_QUOTE`, `DERIBIT_SETTLEMENT`, `DERIBIT_EXPIRY_MS` (exact milliseconds), and `DERIBIT_SIDE` (`call`/`put`/`both`, default `both`).
 
-## 一批采集与期权链汇总
+## Batch Collection and Option-Chain Aggregation
 
-在独立 Bash 进程中运行以下片段，先设置上述参数和 `DERIBIT_BIN`。默认 mainnet，`DERIBIT_ENV=testnet` 可显式切换。每个候选 ticker 只调用一次；请求量为一次 metadata 加 N 次 ticker，先按筛选范围估算 N。收窄范围必须符合用户意图，不能为节省调用随意截断候选集。
+Run the following snippet in a separate Bash process after setting the parameters above and `DERIBIT_BIN`. The default is mainnet; set `DERIBIT_ENV=testnet` to switch explicitly. Call ticker once per candidate; the request count is one metadata request plus N ticker requests, so estimate N from the filter scope first. Narrowing the scope must match the user's intent; do not arbitrarily truncate candidates to save requests.
 
 ```bash
 set -euo pipefail
@@ -69,13 +69,13 @@ jq --arg finished "$batch_finished" --argjson count "$batch_i" '. + {finished_at
 printf 'complete batch=%s; chain=%s\n' "$batch_dir" "$batch_dir/chain.json"
 ```
 
-如有失败，`complete.json` 不会生成；保留目录内的原生响应和 stderr，由 Agent 报告已采集数、失败点及未完成数。该样例 fail-fast、不重试；不能将失败前的部分数据宣称为完整链。响应字段异常时 jq 也会停止，应结合最后一个响应定位原因。没有合约时正常生成空链，不能误报 API 故障。
+If a failure occurs, `complete.json` is not generated; retain the native responses and stderr in the directory, and have the Agent report the number collected, the failure point, and the number incomplete. This example fails fast and does not retry; do not claim the data collected before failure is a complete chain. `jq` also stops when response fields are malformed, so use the last response to locate the cause. No contracts is a normal empty chain and must not be misreported as an API failure.
 
-`complete.json` 表示候选请求已完成，不保证每条响应含有全部报价字段。null 保留为未知；缺失 Delta 在下一步单独记录。`chain.json` 是 Agent 派生表，各种原始 JSON-RPC envelope 保存在旁边。需要 gamma、vega、theta 等时直接读 `greeks`。报价与 volume 等字段的单位必须结合产品元数据说明。
+`complete.json` means the candidate requests are complete; it does not guarantee that every response contains every quote field. Preserve null as unknown; record missing Delta separately in the next step. `chain.json` is an Agent-derived table, with the various raw JSON-RPC envelopes saved alongside it. Read `greeks` directly when gamma, vega, theta, or similar values are needed. Explain the units of quote, volume, and other fields using the product metadata.
 
-## 在固定数据上筛选 Delta
+## Filter Delta on Fixed Data
 
-设置 `DERIBIT_BATCH_DIR` 为刚才打印的目录、`DERIBIT_TARGET_DELTA` 为 signed target，例如 Put 常见 `-0.25`。默认返回 5 个候选，`DERIBIT_TOP` 可改为正整数。这个片段只读已完成批次，不请求行情；重新选择目标也复用这一批数据。
+Set `DERIBIT_BATCH_DIR` to the directory just printed and `DERIBIT_TARGET_DELTA` to a signed target, such as the common Put target `-0.25`. The default is 5 candidates; `DERIBIT_TOP` can be changed to a positive integer. This snippet reads only the completed batch and makes no market-data requests; selecting a new target also reuses this batch.
 
 ```bash
 set -euo pipefail
@@ -93,4 +93,4 @@ jq -n --argjson target "$DERIBIT_TARGET_DELTA" --argjson top "$option_top" --slu
   end'
 ```
 
-排序键先是 `abs(delta - target)`，并列时按 instrument 名稳定排序；不添加用户没有要求的流动性或价差过滤。结果为“本批有有效 Delta 的候选中最接近目标”，存在 excluded 时不能保证覆盖全链。数据可能过时；报告原始采集窗口，不能把重新排序的时间说成行情时间。
+The primary sort key is `abs(delta - target)`, with stable tie-breaking by instrument name; do not add liquidity or spread filters the user did not request. The result is “closest to the target among candidates with valid Delta in this batch”; when `excluded` is nonempty, it cannot be guaranteed to cover the full chain. Data may be stale; report the original collection window and do not describe the re-sorting time as the market-data time.

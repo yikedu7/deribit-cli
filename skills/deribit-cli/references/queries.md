@@ -1,8 +1,8 @@
-# 常用查询样例
+# Common Query Examples
 
-以下为 Agent 按任务选用的代码片段，不是新增的 CLI 功能。先按 Skill 定位 binary，将绝对路径存入 `DERIBIT_BIN`。示例不应整页执行；只运行用户需要的调用。Shell 命令均不使用反斜杠续行。
+These are code snippets selected by the Agent for a task, not new CLI functionality. Locate the binary as described by the Skill and store its absolute path in `DERIBIT_BIN`. Do not run the whole page; run only the calls the user needs. Shell commands do not use backslash continuations.
 
-## 单接口
+## Single Methods
 
 ```sh
 "$DERIBIT_BIN" public get-index-price --index-name btc_usd
@@ -16,11 +16,11 @@
 "$DERIBIT_BIN" public get-combo-ids --currency BTC --state active
 ```
 
-合约 `BTC-PERPETUAL` 只是官方命名样例；到期期权的标识应从当前元数据取得，不能复用过期的示例名。Combo 详情需要从列表取得真实 `combo_id`。
+`BTC-PERPETUAL` is only an official naming example; obtain expiring-option identifiers from current metadata and do not reuse stale example names. Obtain the real `combo_id` for combo details from the list.
 
-## 原生参数与错误检查
+## Native Parameters and Error Checking
 
-以下三行是互相替代的调用方式；`order-book-params.json` 的内容应为 `{"instrument_name":"BTC-PERPETUAL","depth":5}`。
+The following three lines are alternative invocation forms; `order-book-params.json` should contain `{"instrument_name":"BTC-PERPETUAL","depth":5}`.
 
 ```sh
 "$DERIBIT_BIN" --params '{"instrument_name":"BTC-PERPETUAL","depth":5}' public get-order-book
@@ -28,7 +28,7 @@
 printf '%s\n' '{"instrument_name":"BTC-PERPETUAL","depth":5}' | "$DERIBIT_BIN" --params-stdin public get-order-book
 ```
 
-使用独立临时目录保留原生响应与诊断。先确认退出码，再读取 `.result`；不要直接把 CLI 管道接入 `jq` 后忽略 CLI 的退出状态。
+Use a separate temporary directory to retain the native response and diagnostics. Check the exit code before reading `.result`; do not pipe the CLI directly into `jq` while ignoring the CLI exit status.
 
 ```sh
 query_dir=$(mktemp -d)
@@ -40,11 +40,11 @@ else
 fi
 ```
 
-该片段仅示范结果分支；若嵌入自动化，应在失败分支传播 `query_rc`，不能继续计算。`jq -e` 会对合法的 `false`/`null` 结果给出非零状态；跨方法的通用成功判断应使用 `has("result") and (has("error") | not)`，再单独读取 payload。本例 ticker 的成功结果应为 object。
+This snippet only illustrates result handling; when embedded in automation, propagate `query_rc` in the failure branch and do not continue calculating. `jq -e` returns a nonzero status for valid `false`/`null` results; the generic success check across methods should be `has("result") and (has("error") | not)`, followed by separate payload extraction. The successful result for this ticker example should be an object.
 
-## 历史区间
+## Historical Ranges
 
-先把用户指定的起止时间（含时区）转换为 Unix 毫秒，赋给 `DERIBIT_START_MS` 与 `DERIBIT_END_MS`；确认起点小于终点。不要用本地日期字符串直接传参。下面是 Bash 的必填变量检查；在独立 shell 中运行，不改变交互 shell 的错误处理设置。
+First convert the user-specified start and end times (including timezone) to Unix milliseconds and assign them to `DERIBIT_START_MS` and `DERIBIT_END_MS`; confirm that the start is earlier than the end. Do not pass local date strings directly. The following is a Bash required-variable check; run it in a separate shell so it does not change the interactive shell's error-handling settings.
 
 ```bash
 : "${DERIBIT_START_MS:?set start Unix milliseconds}"
@@ -53,9 +53,9 @@ fi
 "$DERIBIT_BIN" public get-volatility-index-data --currency BTC --start-timestamp "$DERIBIT_START_MS" --end-timestamp "$DERIBIT_END_MS" --resolution 3600
 ```
 
-这两个命令是不同查询，按需选用。DVOL 的 `resolution` 使用秒或 `1D`；不要套用 K 线接口以分钟为单位的 resolution。观察响应的 continuation/时间范围决定是否需要下一页，避免声称一次结果已覆盖整个历史区间。
+These are different queries; use whichever is needed. DVOL's `resolution` uses seconds or `1D`; do not apply the candle endpoint's minute-based resolution. Use the response continuation/time range to determine whether another page is needed, and avoid claiming that one result covers the entire historical interval.
 
-## 期权链的两种信息量
+## Two Levels of Option-Chain Detail
 
-- 仅需报价汇总：保存一次 `get-instruments` 和一次 `get-book-summary-by-currency` 响应，以 `instrument_name` 关联，先按元数据的到期时间和标的筛选。保留缺少行情的合约及其 missing 状态，不把缺失 bid/ask 当作零。
-- 需要 Greeks/Delta：使用 [期权组合样例](options.md) 的逐合约 ticker 采集。不要假定 book summary 含有 Greeks，也不要为了减少请求而只取部分执行价却声称全链最接近目标。
+- Quote summary only: save one `get-instruments` response and one `get-book-summary-by-currency` response, join them by `instrument_name`, and filter first by the metadata expiration and underlying. Keep contracts with missing market data and their missing status; do not treat missing bid/ask as zero.
+- Greeks/Delta required: use the per-instrument ticker collection in the [option-chain example](options.md). Do not assume that book summary contains Greeks, and do not take only part of the strike range to reduce requests while claiming the closest result across the full chain.
