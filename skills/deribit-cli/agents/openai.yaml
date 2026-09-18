@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deribit CLI"
+  short_description: "Read-only Deribit queries and option analysis"
+  default_prompt: "使用 $deribit-cli 查询 Deribit 公开行情，并按我的条件组合查询和分析期权数据。"
