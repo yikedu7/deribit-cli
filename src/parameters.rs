@@ -183,7 +183,7 @@ fn decode_raw(
             "raw parameters are empty or whitespace-only".into(),
         ));
     }
-    JsonAudit::new(text).audit()?;
+    audit_json(text)?;
     let value: Value = serde_json::from_str(text)
         .map_err(|error| ParameterError::Input(format!("invalid JSON: {error}")))?;
     let object = value.as_object().ok_or_else(|| {
@@ -342,6 +342,11 @@ fn compare_magnitude(left: &str, right: &str) -> Ordering {
     left.len()
         .cmp(&right.len())
         .then_with(|| left.as_bytes().cmp(right.as_bytes()))
+}
+
+/// Rejects ambiguous JSON and inputs exceeding the supported nesting depth.
+pub fn audit_json(text: &str) -> Result<(), ParameterError> {
+    JsonAudit::new(text).audit()
 }
 
 struct JsonAudit<'a> {

@@ -168,6 +168,23 @@ fn execute_rpc<T: Transport>(
     Ok(NativeResponse::from_rpc(request.parse_response(response)?))
 }
 
+/// Runs the v1 CLI with the process streams and returns its exit classification.
+pub fn run_stdio(args: impl IntoIterator<Item = OsString>) -> ProcessExit {
+    let stdin = io::stdin();
+    let stdin_is_terminal = stdin.is_terminal();
+    let output = run_process(args, &mut stdin.lock(), stdin_is_terminal);
+    let mut stdout = io::stdout().lock();
+    let mut stderr = io::stderr().lock();
+    match output.write_to(&mut stdout, &mut stderr) {
+        Ok(()) => output.exit(),
+        Err(error) => {
+            let fallback = local_io_failure(&error);
+            let _ = fallback.write_to(&mut stdout, &mut stderr);
+            ProcessExit::LocalIo
+        }
+    }
+}
+
 /// Parses argv using the embedded registry and runs the product adapter.
 pub fn run_process<I, T>(args: I, stdin: &mut dyn Read, stdin_is_terminal: bool) -> ProcessOutput
 where

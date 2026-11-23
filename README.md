@@ -1,12 +1,12 @@
 # deribit-cli
 
-A read-only Rust CLI and agent skill for Deribit public market data and options analysis.
+A Rust CLI for Deribit and an agent skill for public market data and options analysis.
 
 Current release: v0.1.0.
 
 Query market data directly from your terminal, or let an agent compose CLI calls to build option chains and find contracts nearest a target Delta. No API keys required.
 
-## Features
+## v0.1.0 features
 
 - 38 public methods covering instruments, tickers, order books, trades, volatility, funding, and published combos.
 - Native JSON-RPC output for scripts and table output for terminal use.
@@ -58,9 +58,27 @@ Place global options before `public` and method parameters after the method name
 
 JSON is the default output format. Successful responses retain the JSON-RPC envelope, with data in `.result`. Check the exit status and `.error` before processing results; use `--output table` only for human-readable output. Each invocation makes one request, with no automatic retries or pagination.
 
+## General API CLI (source build)
+
+The separate `deribit-cli-api` source build produces a `deribit-cli` binary with the original public commands and an `api` command for the shared JSON-RPC and WebSocket catalog. The root package and published v0.1.0 archives remain read-only.
+
+```sh
+cargo build --release --locked --manifest-path testnet-v2/Cargo.toml
+cli=./testnet-v2/target/release/deribit-cli
+"$cli" api --env testnet catalog
+"$cli" api --env mainnet rpc public/get_time
+"$cli" api --env testnet rpc public/get_time
+```
+
+`api` requires `--env mainnet` or `--env testnet`. The profiles use the fixed official WebSocket endpoints at `www.deribit.com` and `test.deribit.com` respectively. A failed request stays on the selected profile. The `testnet` alias selects Testnet for existing scripts.
+
+Public reads need no credentials. For private calls, `--authenticate` reads the selected profile’s variables from the process environment. Mainnet uses `DERIBIT_MAINNET_CLIENT_ID` and `DERIBIT_MAINNET_CLIENT_SECRET`. Testnet defaults to `DERIBIT_TESTNET_CLIENT_ID` and `DERIBIT_TESTNET_CLIENT_SECRET`. Mainnet authentication also requires an explicit `--scope`, for example `connection account:read`, and the CLI checks the granted scope before private calls. Write calls require `--allow-write`, Mainnet writes additionally require `--allow-mainnet-write`, and special actions require `--allow-special`. Deribit authorizes each operation.
+
+The catalog contains 187 RPC methods and 43 WebSocket channel templates. Recorded Testnet runs verified 145/187 RPC methods, including 37/37 Trading methods, and received subscription acknowledgments for 41/43 templates and events for 27/43. These totals cover the tested scenarios for each method or template. Mainnet private and write paths were checked with offline fixtures.
+
 ## Agent skill
 
-The repository includes a [deribit-cli skill](skills/deribit-cli/SKILL.md) that teaches an agent how to discover available commands, combine queries, and interpret results. The agent handles composition; the CLI remains a set of public-data primitives, with no additional analysis commands or dedicated analysis runtime.
+The repository includes a [deribit-cli skill](skills/deribit-cli/SKILL.md) that teaches an agent how to discover public commands, combine queries, and interpret results. The skill uses the original public-data commands for agent-side composition and analysis.
 
 To use it:
 
