@@ -60,13 +60,13 @@ JSON is the default output format. Successful responses retain the JSON-RPC enve
 
 ## General API CLI (source build)
 
-Build the `deribit-cli-api` crate from a repository checkout to get the original public commands plus `api` for the shared JSON-RPC and WebSocket catalog. Its manifest is at `api-cli/Cargo.toml`. Update build scripts that used `testnet-v2/Cargo.toml` to use this path. The root Cargo package and published v0.1.0 archives contain the public CLI.
+Enable the `general-api` feature in the root Cargo package to add the shared JSON-RPC and WebSocket catalog to `deribit-cli`. The default build and published v0.1.0 binaries provide the 38 public read-only methods.
 
-Both builds produce an executable named `deribit-cli` (`deribit-cli.exe` on Windows). The command below puts the general API build in its own Cargo target directory. Invoke that binary by path to select it.
+Run these commands from the repository root. The build uses the same `target/release/deribit-cli` path as the default build (`deribit-cli.exe` on Windows).
 
 ```sh
-cargo build --release --locked --manifest-path api-cli/Cargo.toml --target-dir api-cli/target
-cli=./api-cli/target/release/deribit-cli
+cargo build --release --locked --features general-api
+cli=./target/release/deribit-cli
 ```
 
 Help and catalog inspection are local and require no credentials. Use `api --help` to identify the general API build. The `coverage` command still reports the 38 public methods.
@@ -78,10 +78,10 @@ Help and catalog inspection are local and require no credentials. Use `api --hel
 "$cli" testnet catalog
 ```
 
-With dependencies cached, run the general API suite offline. It uses local fixtures and loopback servers.
+With dependencies cached, run both the public CLI and general API tests offline with the feature enabled. These tests use local fixtures and loopback servers.
 
 ```sh
-cargo test --offline --locked --all-targets --manifest-path api-cli/Cargo.toml --target-dir api-cli/target
+cargo test --offline --locked --all-targets --features general-api
 ```
 
 `api` requires `--env mainnet` or `--env testnet`. The profiles use the fixed official WebSocket endpoints at `www.deribit.com` and `test.deribit.com` respectively. A failed request stays on the selected profile. The general API binary also supports the legacy `testnet` command, which always selects Testnet.

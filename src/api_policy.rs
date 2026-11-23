@@ -3,8 +3,8 @@ use std::net::Ipv4Addr;
 
 use serde_json::{Map, Value};
 
-use crate::application::{Call, Failure};
-use crate::catalog::{Catalog, Effect};
+use crate::api_application::{Call, Failure};
+use crate::api_catalog::{Catalog, Effect};
 
 pub(crate) struct Scope<'a>(&'a str);
 

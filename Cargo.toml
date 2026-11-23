@@ -11,6 +11,7 @@ homepage = "https://github.com/yikedu7/deribit-cli"
 documentation = "https://docs.rs/deribit-cli"
 include = [
     "assets/api-method-manifest-v1.json",
+    "assets/api-catalog.json",
     "Cargo.lock",
     "Cargo.toml",
     "LICENSE",
@@ -19,13 +20,20 @@ include = [
     "src/**",
 ]
 
+[features]
+general-api = ["dep:aws-lc-rs", "dep:futures-util", "dep:tokio", "dep:tokio-tungstenite"]
+
 [dependencies]
+aws-lc-rs = { version = "1", default-features = false, optional = true }
 clap = { version = "4.5", default-features = false, features = ["error-context", "help", "std", "string", "usage"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"], optional = true }
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 tabled = { version = "0.20", default-features = false, features = ["std"] }
 thiserror = "2"
+tokio = { version = "1", features = ["net", "rt", "time"], optional = true }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"], optional = true }
 url = "2"
 uuid = { version = "1", features = ["v4"] }
 

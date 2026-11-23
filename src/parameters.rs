@@ -345,7 +345,7 @@ fn compare_magnitude(left: &str, right: &str) -> Ordering {
 }
 
 /// Rejects ambiguous JSON and inputs exceeding the supported nesting depth.
-pub fn audit_json(text: &str) -> Result<(), ParameterError> {
+pub(crate) fn audit_json(text: &str) -> Result<(), ParameterError> {
     JsonAudit::new(text).audit()
 }
 

@@ -8,6 +8,12 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "general-api")]
+mod api_application;
+#[cfg(feature = "general-api")]
+mod api_catalog;
+#[cfg(feature = "general-api")]
+mod api_policy;
 pub mod application;
 pub mod cli;
 pub mod commands;
@@ -24,6 +30,8 @@ pub mod rpc;
 pub mod runtime;
 pub mod table_profiles;
 pub mod transport;
+#[cfg(feature = "general-api")]
+mod websocket_transport;
 
 pub use application::{
     ApplicationError, ProcessExit, ProcessOutput, execute_public, render_public_result,

@@ -1,7 +1,7 @@
 //! Profile-bound access to the pinned Deribit API.
 
 #[cfg(test)]
-#[path = "application_tests.rs"]
+#[path = "api_application_tests.rs"]
 mod tests;
 
 use std::ffi::OsString;
@@ -15,44 +15,20 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use thiserror::Error;
 
-use crate::catalog::{CATALOG_JSON, Catalog, Effect};
-use crate::policy::{Scope, is_mainnet_action};
-use crate::socket::{Credentials, Session};
+use crate::api_catalog::{CATALOG_JSON, Catalog, Effect};
+use crate::api_policy::{Scope, is_mainnet_action};
+use crate::configuration::Environment;
+use crate::websocket_transport::{Credentials, Session};
 
 const INPUT_LIMIT: usize = 1024 * 1024;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Profile {
-    Mainnet,
-    Testnet,
-}
-
-impl ValueEnum for Profile {
+impl ValueEnum for Environment {
     fn value_variants<'a>() -> &'a [Self] {
         &[Self::Mainnet, Self::Testnet]
     }
 
     fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
-        Some(
-            match self {
-                Self::Mainnet => "mainnet",
-                Self::Testnet => "testnet",
-            }
-            .into(),
-        )
-    }
-}
-
-impl Profile {
-    pub(crate) fn endpoint(self) -> &'static str {
-        match self {
-            Self::Mainnet => "wss://www.deribit.com/ws/api/v2",
-            Self::Testnet => "wss://test.deribit.com/ws/api/v2",
-        }
-    }
-
-    pub(crate) fn accepts(self, response: &Value) -> bool {
-        response.get("testnet").and_then(Value::as_bool) == Some(self == Self::Testnet)
+        Some(self.as_str().into())
     }
 }
 
@@ -155,7 +131,7 @@ fn command(legacy_testnet: bool) -> Command {
                 Arg::new("env")
                     .long("env")
                     .required(true)
-                    .value_parser(clap::value_parser!(Profile))
+                    .value_parser(clap::value_parser!(Environment))
                     .help("Select the fixed official Deribit endpoint"),
             )
             .arg(switch(
@@ -256,9 +232,11 @@ pub fn run(args: impl IntoIterator<Item = OsString>, legacy_testnet: bool) -> i3
         }
     };
     let profile = if legacy_testnet {
-        Profile::Testnet
+        Environment::Testnet
     } else {
-        *matches.get_one::<Profile>("env").expect("required profile")
+        *matches
+            .get_one::<Environment>("env")
+            .expect("required profile")
     };
     let mut output = io::stdout().lock();
     match run_command(profile, matches, legacy_testnet, &mut output) {
@@ -271,7 +249,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>, legacy_testnet: bool) -> i3
 }
 
 fn run_command(
-    profile: Profile,
+    profile: Environment,
     matches: ArgMatches,
     legacy_testnet: bool,
     output: &mut impl Write,
@@ -283,7 +261,7 @@ fn run_command(
         allow_special: options.get_flag("allow-special"),
         allow_mainnet_write: !legacy_testnet && options.get_flag("allow-mainnet-write"),
     };
-    if profile != Profile::Mainnet && permissions.allow_mainnet_write {
+    if profile != Environment::Mainnet && permissions.allow_mainnet_write {
         return Err(Failure::Input(
             "--allow-mainnet-write requires --env mainnet",
         ));
@@ -296,7 +274,7 @@ fn run_command(
     let catalog = Catalog::load();
     let continue_read_errors = command == "session" && options.get_flag("continue-read-errors");
     let requested = options.get_one::<String>("scope");
-    let mainnet_scope = if profile == Profile::Mainnet && permissions.authenticate {
+    let mainnet_scope = if profile == Environment::Mainnet && permissions.authenticate {
         Some(Scope::request(requested.ok_or(Failure::Input(
             "Mainnet authentication requires explicit --scope",
         ))?)?)
@@ -335,7 +313,7 @@ fn run_command(
         match step {
             Step::Rpc(call) => {
                 validate_call(&catalog, &permissions, call)?;
-                if profile == Profile::Mainnet {
+                if profile == Environment::Mainnet {
                     if is_mainnet_action(call, &catalog) && !permissions.allow_mainnet_write {
                         return Err(Failure::Input(
                             "Mainnet action requires explicit --allow-mainnet-write",
@@ -629,7 +607,7 @@ fn read_json<T: serde::de::DeserializeOwned>(path: Option<&PathBuf>) -> Result<T
         return Err(Failure::Input("JSON input exceeds 1 MiB"));
     }
     let text = std::str::from_utf8(&data).map_err(|_| Failure::Input("input must be UTF-8"))?;
-    deribit_cli::parameters::audit_json(text)
+    crate::parameters::audit_json(text)
         .map_err(|_| Failure::Input("invalid or ambiguous JSON input"))?;
     serde_json::from_str(text).map_err(|_| Failure::Input("invalid JSON input shape"))
 }

@@ -7,7 +7,7 @@ description: Use deribit-cli to query Deribit public market data, instruments, o
 
 Use the existing Rust CLI to obtain official public data; the Agent combines calls and analyzes them according to the user's question. All access is read-only and unauthenticated; do not read, request, or forward credentials. This Skill provides operating instructions and examples; it does not add CLI subcommands or a dedicated analysis runtime.
 
-Use the `public` command group from either the v1 release or a general API source build.
+Use the `public` command group. It is available in the v1 release and in source builds with or without the optional `general-api` feature.
 
 ## Locate the CLI
 

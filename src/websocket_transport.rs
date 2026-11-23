@@ -16,24 +16,29 @@ use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, client_async_tls_with_config};
 
-use crate::application::{Failure, Profile, write_line};
-use deribit_cli::runtime::RequestId;
+use crate::api_application::{Failure, write_line};
+use crate::configuration::Environment;
+use crate::runtime::RequestId;
+
+fn matches_environment(profile: Environment, response: &Value) -> bool {
+    response.get("testnet").and_then(Value::as_bool) == Some(profile == Environment::Testnet)
+}
 
 pub(crate) struct Credentials {
-    profile: Profile,
+    profile: Environment,
     id: String,
     secret: String,
 }
 
 impl Credentials {
     pub fn load(
-        profile: Profile,
+        profile: Environment,
         mount: Option<&Path>,
         id: Option<&str>,
         secret: Option<&str>,
     ) -> Result<Self, Failure> {
         let (id, secret) = selected_variables(profile, id, secret)?;
-        if profile == Profile::Mainnet && mount.is_some() {
+        if profile == Environment::Mainnet && mount.is_some() {
             return Err(Failure::Input(
                 "Mainnet credentials require the dedicated Mainnet environment variables",
             ));
@@ -139,7 +144,7 @@ fn literal_mount_credentials(
 }
 
 fn selected_variables(
-    profile: Profile,
+    profile: Environment,
     id: Option<&str>,
     secret: Option<&str>,
 ) -> Result<(&'static str, &'static str), Failure> {
@@ -147,11 +152,11 @@ fn selected_variables(
     const TESTNET: (&str, &str) = ("DERIBIT_TESTNET_CLIENT_ID", "DERIBIT_TESTNET_CLIENT_SECRET");
     const LEGACY_TESTNET: (&str, &str) = ("DERIBIT_TEST_CLIENT_ID", "DERIBIT_TEST_CLIENT_SECRET");
     match profile {
-        Profile::Mainnet if id.is_none() && secret.is_none() => Ok(MAINNET),
-        Profile::Mainnet => Err(Failure::Input(
+        Environment::Mainnet if id.is_none() && secret.is_none() => Ok(MAINNET),
+        Environment::Mainnet => Err(Failure::Input(
             "Mainnet credentials require the dedicated Mainnet environment variables",
         )),
-        Profile::Testnet => {
+        Environment::Testnet => {
             let pair = (id.unwrap_or(TESTNET.0), secret.unwrap_or(TESTNET.1));
             [TESTNET, LEGACY_TESTNET]
                 .into_iter()
@@ -165,7 +170,7 @@ fn selected_variables(
 
 pub(crate) struct Session<S> {
     stream: WebSocketStream<S>,
-    profile: Profile,
+    profile: Environment,
     timeout: Duration,
     credentials: Option<Credentials>,
     access_token: Option<String>,
@@ -177,7 +182,7 @@ pub(crate) struct Session<S> {
 
 impl Session<MaybeTlsStream<TcpStream>> {
     pub async fn connect(
-        profile: Profile,
+        profile: Environment,
         timeout: Duration,
         credentials: Option<Credentials>,
     ) -> Result<Self, Failure> {
@@ -189,7 +194,7 @@ impl Session<MaybeTlsStream<TcpStream>> {
         }
         let stream = timeout_at(Instant::now() + timeout, async {
             let request = profile
-                .endpoint()
+                .websocket_endpoint()
                 .into_client_request()
                 .map_err(|_| Failure::Connect)?;
             let host = request.uri().host().ok_or(Failure::Connect)?;
@@ -224,7 +229,7 @@ async fn handshake_once<S: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
 impl<S: AsyncRead + AsyncWrite + Unpin> Session<S> {
     fn new(
         stream: WebSocketStream<S>,
-        profile: Profile,
+        profile: Environment,
         timeout: Duration,
         credentials: Option<Credentials>,
     ) -> Self {
@@ -242,7 +247,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Session<S> {
     }
 
     #[cfg(test)]
-    pub(crate) fn fixture(stream: WebSocketStream<S>, profile: Profile) -> Self {
+    pub(crate) fn fixture(stream: WebSocketStream<S>, profile: Environment) -> Self {
         Self::new(
             stream,
             profile,
@@ -355,7 +360,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Session<S> {
     }
 
     fn accept_tokens(&mut self, mut response: Value) -> Result<Value, Failure> {
-        if !self.profile.accepts(&response) {
+        if !matches_environment(self.profile, &response) {
             return Err(Failure::Protocol);
         }
         if let Some(result) = response.get("result") {
@@ -496,7 +501,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Session<S> {
             }
             if let Some(method) = frame["method"].as_str() {
                 if frame.get("id").is_some()
-                    || (frame.get("testnet").is_some() && !self.profile.accepts(&frame))
+                    || (frame.get("testnet").is_some()
+                        && !matches_environment(self.profile, &frame))
                 {
                     return Err(Failure::Protocol);
                 }
@@ -511,7 +517,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Session<S> {
             if frame["id"].as_str().is_none()
                 || frame.get("result").is_some() == frame.get("error").is_some()
                 || frame.get("error").is_some_and(|error| !error.is_object())
-                || !self.profile.accepts(&frame)
+                || !matches_environment(self.profile, &frame)
             {
                 return Err(Failure::Protocol);
             }
@@ -638,12 +644,13 @@ mod tests {
         let writer_mount = mount.clone();
         let writer = std::thread::spawn(move || {
             let mut fifo = OpenOptions::new().write(true).open(writer_mount).unwrap();
-            let (id, secret) = selected_variables(Profile::Testnet, None, None).unwrap();
+            let (id, secret) = selected_variables(Environment::Testnet, None, None).unwrap();
             let fixture =
                 format!("IGNORED=synthetic\n{id}='fixture-id'\n{secret}=\"fixture-secret\"\n");
             fifo.write_all(fixture.as_bytes()).unwrap();
         });
-        let credentials = Credentials::load(Profile::Testnet, Some(&mount), None, None).unwrap();
+        let credentials =
+            Credentials::load(Environment::Testnet, Some(&mount), None, None).unwrap();
         assert_eq!(credentials.id, "fixture-id");
         assert_eq!(credentials.secret, "fixture-secret");
         writer.join().unwrap();
@@ -652,8 +659,8 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn fifo_never_expands_variables_from_another_profile() {
-        let (id, secret) = selected_variables(Profile::Testnet, None, None).unwrap();
-        let (_, mainnet_secret) = selected_variables(Profile::Mainnet, None, None).unwrap();
+        let (id, secret) = selected_variables(Environment::Testnet, None, None).unwrap();
+        let (_, mainnet_secret) = selected_variables(Environment::Mainnet, None, None).unwrap();
         let fixture = format!("{id}=fixture-id\n{secret}=\"${{{mainnet_secret}}}\"\n");
         assert!(matches!(
             literal_mount_credentials(fixture.as_bytes(), id, secret),
@@ -710,10 +717,10 @@ mod tests {
             let client = WebSocketStream::from_raw_socket(client, Role::Client, None).await;
             let mut session = Session::new(
                 client,
-                Profile::Testnet,
+                Environment::Testnet,
                 Duration::from_secs(2),
                 Some(Credentials {
-                    profile: Profile::Testnet,
+                    profile: Environment::Testnet,
                     id: "synthetic-client-id".to_owned(),
                     secret: "synthetic-client-secret".to_owned(),
                 }),
@@ -759,7 +766,8 @@ mod tests {
                 reply(&mut server, &json!({"id":"unrelated"}), json!(0)).await;
             });
             let client = WebSocketStream::from_raw_socket(client, Role::Client, None).await;
-            let mut session = Session::new(client, Profile::Testnet, Duration::from_secs(2), None);
+            let mut session =
+                Session::new(client, Environment::Testnet, Duration::from_secs(2), None);
             let result = session
                 .call("public/get_time", Map::new(), false, &mut Vec::new())
                 .await;
@@ -770,7 +778,7 @@ mod tests {
 
     #[test]
     fn disconnect_after_a_write_requires_reconciliation() {
-        use crate::{application::uncertain_write, catalog::Effect};
+        use crate::{api_application::uncertain_write, api_catalog::Effect};
 
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -787,7 +795,8 @@ mod tests {
                 server.close(None).await.unwrap();
             });
             let client = WebSocketStream::from_raw_socket(client, Role::Client, None).await;
-            let mut session = Session::new(client, Profile::Testnet, Duration::from_secs(2), None);
+            let mut session =
+                Session::new(client, Environment::Testnet, Duration::from_secs(2), None);
             session.access_token = Some(SYNTHETIC_ACCESS.to_owned());
             let params =
                 Map::from_iter([("label".to_owned(), json!("synthetic-owned-test-order"))]);
@@ -838,7 +847,8 @@ mod tests {
                 .await;
             });
             let client = WebSocketStream::from_raw_socket(client, Role::Client, None).await;
-            let mut session = Session::new(client, Profile::Testnet, Duration::from_secs(2), None);
+            let mut session =
+                Session::new(client, Environment::Testnet, Duration::from_secs(2), None);
             session.access_token = Some("synthetic-token".to_owned());
             let mut output = Vec::new();
             let verify = session
@@ -891,7 +901,8 @@ mod tests {
                 server.close(None).await.unwrap();
             });
             let client = WebSocketStream::from_raw_socket(client, Role::Client, None).await;
-            let mut session = Session::new(client, Profile::Testnet, Duration::from_secs(2), None);
+            let mut session =
+                Session::new(client, Environment::Testnet, Duration::from_secs(2), None);
             session.access_token = Some(SYNTHETIC_ACCESS.to_owned());
             let params = Map::from_iter([("invalidate_token".to_owned(), json!(false))]);
             let result = session
@@ -944,7 +955,8 @@ mod tests {
                 );
             });
             let client = WebSocketStream::from_raw_socket(client, Role::Client, None).await;
-            let mut session = Session::new(client, Profile::Testnet, Duration::from_secs(2), None);
+            let mut session =
+                Session::new(client, Environment::Testnet, Duration::from_secs(2), None);
             session.access_token = Some("synthetic-token".to_owned());
             for (method, code) in CASES {
                 let response = session
@@ -965,20 +977,22 @@ mod tests {
         let main_id = "DERIBIT_MAINNET_CLIENT_ID";
         let main_secret = "DERIBIT_MAINNET_CLIENT_SECRET";
         assert_eq!(
-            selected_variables(Profile::Mainnet, None, None).unwrap(),
+            selected_variables(Environment::Mainnet, None, None).unwrap(),
             (main_id, main_secret)
         );
         assert_eq!(
-            selected_variables(Profile::Testnet, Some(legacy_id), Some(legacy_secret)).unwrap(),
+            selected_variables(Environment::Testnet, Some(legacy_id), Some(legacy_secret)).unwrap(),
             (legacy_id, legacy_secret)
         );
-        assert!(selected_variables(Profile::Testnet, Some(legacy_id), None).is_err());
-        assert!(selected_variables(Profile::Testnet, Some(main_id), Some(main_secret)).is_err());
+        assert!(selected_variables(Environment::Testnet, Some(legacy_id), None).is_err());
         assert!(
-            selected_variables(Profile::Mainnet, Some(legacy_id), Some(legacy_secret)).is_err()
+            selected_variables(Environment::Testnet, Some(main_id), Some(main_secret)).is_err()
+        );
+        assert!(
+            selected_variables(Environment::Mainnet, Some(legacy_id), Some(legacy_secret)).is_err()
         );
         assert!(matches!(
-            Credentials::load(Profile::Mainnet, Some(Path::new("/unused")), None, None),
+            Credentials::load(Environment::Mainnet, Some(Path::new("/unused")), None, None),
             Err(Failure::Input(_))
         ));
         tokio::runtime::Builder::new_current_thread()
@@ -986,9 +1000,9 @@ mod tests {
             .unwrap()
             .block_on(async {
                 let result = Session::connect(
-                    Profile::Mainnet,
+                    Environment::Mainnet,
                     Duration::ZERO,
-                    Some(fixture_credentials(Profile::Testnet)),
+                    Some(fixture_credentials(Environment::Testnet)),
                 )
                 .await;
                 assert!(matches!(result, Err(Failure::Credentials)));
@@ -1028,7 +1042,7 @@ mod tests {
             .build()
             .unwrap();
         runtime.block_on(async {
-            for profile in [Profile::Testnet, Profile::Mainnet] {
+            for profile in [Environment::Testnet, Environment::Mainnet] {
                 let (client, server) = duplex(8192);
                 let server = tokio::spawn(async move {
                     let mut server = WebSocketStream::from_raw_socket(server, Role::Server, None).await;
@@ -1037,7 +1051,7 @@ mod tests {
                     reply_with_marker(
                         &mut server, &request,
                         json!({"access_token":WRONG_PROFILE_ACCESS,"scope":"mainaccount trade:read_write"}),
-                        profile == Profile::Mainnet,
+                        profile == Environment::Mainnet,
                     ).await;
                     assert!(timeout_at(Instant::now() + Duration::from_millis(15), server.next()).await.is_err());
                 });
@@ -1092,9 +1106,9 @@ mod tests {
                 let client = WebSocketStream::from_raw_socket(client, Role::Client, None).await;
                 let mut session = Session::new(
                     client,
-                    Profile::Testnet,
+                    Environment::Testnet,
                     Duration::from_secs(2),
-                    Some(fixture_credentials(Profile::Testnet)),
+                    Some(fixture_credentials(Environment::Testnet)),
                 );
                 session
                     .accept_tokens(json!({"testnet": true, "result": {
@@ -1121,16 +1135,16 @@ mod tests {
 
     #[test]
     fn both_profiles_serialize_move_positions_and_reject_opposite_write_reply() {
-        use crate::{application::uncertain_write, catalog::Effect};
+        use crate::{api_application::uncertain_write, api_catalog::Effect};
 
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
         runtime.block_on(async {
-            for profile in [Profile::Testnet, Profile::Mainnet] {
+            for profile in [Environment::Testnet, Environment::Mainnet] {
                 let (client, server) = duplex(8192);
-                let marker = profile == Profile::Testnet;
+                let marker = profile == Environment::Testnet;
                 let server = tokio::spawn(async move {
                     let mut server = WebSocketStream::from_raw_socket(server, Role::Server, None).await;
                     let auth = next_request(&mut server).await;
@@ -1174,7 +1188,7 @@ mod tests {
         });
     }
 
-    fn fixture_credentials(profile: Profile) -> Credentials {
+    fn fixture_credentials(profile: Environment) -> Credentials {
         Credentials {
             profile,
             id: "synthetic-client-id".to_owned(),

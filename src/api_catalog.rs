@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
-pub(crate) const CATALOG_JSON: &str = include_str!("../assets/catalog.json");
+pub(crate) const CATALOG_JSON: &str = include_str!("../assets/api-catalog.json");
 
 #[derive(Deserialize)]
 pub(crate) struct Catalog {

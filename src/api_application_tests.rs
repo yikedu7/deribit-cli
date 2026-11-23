@@ -7,7 +7,7 @@ use tokio_tungstenite::{
 };
 
 use super::{
-    Authentication, Call, Catalog, Failure, Profile, Scope, Session, Step, is_mainnet_action,
+    Authentication, Call, Catalog, Environment, Failure, Scope, Session, Step, is_mainnet_action,
     run_steps,
 };
 
@@ -124,7 +124,7 @@ fn mainnet_dispatch_uses_actual_grant_and_halts_on_profile_or_write_failure() {
             }));
             let scope = Scope::request("connection trade:read_write").unwrap();
             scope.prepare(&mut mov,&catalog).unwrap();
-            let session = Session::fixture(client, Profile::Mainnet);
+            let session = Session::fixture(client, Environment::Mainnet);
             let mut out = Vec::new();
             let result = run_steps(session, &catalog, &Authentication {
                 enabled: true, requested: None, mainnet_scope: Some(scope)

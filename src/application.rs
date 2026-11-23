@@ -168,6 +168,33 @@ fn execute_rpc<T: Transport>(
     Ok(NativeResponse::from_rpc(request.parse_response(response)?))
 }
 
+/// Runs the CLI with process streams, including opt-in API commands when built.
+pub fn run_cli(args: impl IntoIterator<Item = OsString>) -> i32 {
+    #[cfg(feature = "general-api")]
+    {
+        let mut args = args.into_iter().peekable();
+        let program = args.next();
+        match args.peek().and_then(|arg| arg.to_str()) {
+            Some("api") => crate::api_application::run(args, false),
+            Some("testnet") => crate::api_application::run(args, true),
+            Some("--help" | "-h") => {
+                let flag = args.next();
+                let top_help = args.peek().is_none();
+                let exit = run_stdio(program.into_iter().chain(flag).chain(args));
+                if top_help && exit.code() == 0 {
+                    println!(
+                        "\nAPI catalog and WebSocket commands\n  deribit-cli api --env <mainnet|testnet> <COMMAND>\n  deribit-cli api --help\n  deribit-cli testnet --help  (compatibility command for Testnet)"
+                    );
+                }
+                exit.code()
+            }
+            _ => run_stdio(program.into_iter().chain(args)).code(),
+        }
+    }
+    #[cfg(not(feature = "general-api"))]
+    run_stdio(args).code()
+}
+
 /// Runs the v1 CLI with the process streams and returns its exit classification.
 pub fn run_stdio(args: impl IntoIterator<Item = OsString>) -> ProcessExit {
     let stdin = io::stdin();
