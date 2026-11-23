@@ -2,16 +2,16 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
-pub(super) const CATALOG_JSON: &str = include_str!("catalog.json");
+pub(crate) const CATALOG_JSON: &str = include_str!("../assets/catalog.json");
 
 #[derive(Deserialize)]
-pub(super) struct Catalog {
+pub(crate) struct Catalog {
     methods: Vec<Method>,
     channels: Vec<Channel>,
 }
 
 #[derive(Deserialize)]
-pub(super) struct Method {
+pub(crate) struct Method {
     #[serde(rename = "method")]
     pub name: String,
     pub auth: bool,
@@ -22,7 +22,7 @@ pub(super) struct Method {
 
 #[derive(Clone, Copy, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub(super) enum Effect {
+pub(crate) enum Effect {
     Authentication,
     Read,
     Session,
@@ -31,7 +31,7 @@ pub(super) enum Effect {
 }
 
 #[derive(Deserialize)]
-pub(super) struct Channel {
+pub(crate) struct Channel {
     pub channel: String,
     pub auth: bool,
     pub auth_for_raw: bool,

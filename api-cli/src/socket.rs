@@ -16,10 +16,10 @@ use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, client_async_tls_with_config};
 
-use super::{Failure, Profile, write_line};
+use crate::application::{Failure, Profile, write_line};
 use deribit_cli::runtime::RequestId;
 
-pub(super) struct Credentials {
+pub(crate) struct Credentials {
     profile: Profile,
     id: String,
     secret: String,
@@ -163,7 +163,7 @@ fn selected_variables(
     }
 }
 
-pub(super) struct Session<S> {
+pub(crate) struct Session<S> {
     stream: WebSocketStream<S>,
     profile: Profile,
     timeout: Duration,
@@ -242,7 +242,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Session<S> {
     }
 
     #[cfg(test)]
-    pub(super) fn fixture(stream: WebSocketStream<S>, profile: Profile) -> Self {
+    pub(crate) fn fixture(stream: WebSocketStream<S>, profile: Profile) -> Self {
         Self::new(
             stream,
             profile,
@@ -770,7 +770,7 @@ mod tests {
 
     #[test]
     fn disconnect_after_a_write_requires_reconciliation() {
-        use super::super::{Effect, uncertain_write};
+        use crate::{application::uncertain_write, catalog::Effect};
 
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -1121,7 +1121,7 @@ mod tests {
 
     #[test]
     fn both_profiles_serialize_move_positions_and_reject_opposite_write_reply() {
-        use super::super::{Effect, uncertain_write};
+        use crate::{application::uncertain_write, catalog::Effect};
 
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()

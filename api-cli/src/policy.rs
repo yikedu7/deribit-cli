@@ -3,9 +3,10 @@ use std::net::Ipv4Addr;
 
 use serde_json::{Map, Value};
 
-use super::{Call, Catalog, Effect, Failure};
+use crate::application::{Call, Failure};
+use crate::catalog::{Catalog, Effect};
 
-pub(super) struct Scope<'a>(&'a str);
+pub(crate) struct Scope<'a>(&'a str);
 
 impl<'a> Scope<'a> {
     pub fn request(value: &'a str) -> Result<Self, Failure> {
@@ -187,7 +188,7 @@ fn required_capabilities<'a>(
     documented.into_iter().chain(channel_scopes)
 }
 
-pub(super) fn is_mainnet_action(call: &Call, catalog: &Catalog) -> bool {
+pub(crate) fn is_mainnet_action(call: &Call, catalog: &Catalog) -> bool {
     let effect = catalog.method(&call.method).expect("prevalidated").effect;
     matches!(effect, Effect::Write | Effect::Special)
         || matches!(

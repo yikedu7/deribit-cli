@@ -1,9 +1,7 @@
 //! Profile-bound access to the pinned Deribit API.
 
-mod catalog;
-mod policy;
-mod socket;
 #[cfg(test)]
+#[path = "application_tests.rs"]
 mod tests;
 
 use std::ffi::OsString;
@@ -17,14 +15,14 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use thiserror::Error;
 
-use catalog::{CATALOG_JSON, Catalog, Effect};
-use policy::{Scope, is_mainnet_action};
-use socket::Session;
+use crate::catalog::{CATALOG_JSON, Catalog, Effect};
+use crate::policy::{Scope, is_mainnet_action};
+use crate::socket::{Credentials, Session};
 
 const INPUT_LIMIT: usize = 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Profile {
+pub(crate) enum Profile {
     Mainnet,
     Testnet,
 }
@@ -46,20 +44,20 @@ impl ValueEnum for Profile {
 }
 
 impl Profile {
-    fn endpoint(self) -> &'static str {
+    pub(crate) fn endpoint(self) -> &'static str {
         match self {
             Self::Mainnet => "wss://www.deribit.com/ws/api/v2",
             Self::Testnet => "wss://test.deribit.com/ws/api/v2",
         }
     }
 
-    fn accepts(self, response: &Value) -> bool {
+    pub(crate) fn accepts(self, response: &Value) -> bool {
         response.get("testnet").and_then(Value::as_bool) == Some(self == Self::Testnet)
     }
 }
 
 #[derive(Debug, Error)]
-enum Failure {
+pub(crate) enum Failure {
     #[error("{0}")]
     Input(&'static str),
     #[error("could not load the selected profile's credentials")]
@@ -111,10 +109,10 @@ enum Step {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Call {
-    method: String,
+pub(crate) struct Call {
+    pub(crate) method: String,
     #[serde(default)]
-    params: Map<String, Value>,
+    pub(crate) params: Map<String, Value>,
     #[serde(default, deserialize_with = "deserialize_expected_result")]
     expect_result: Option<Value>,
 }
@@ -379,7 +377,7 @@ fn run_command(
         ));
     }
     let credentials = if permissions.authenticate {
-        Some(socket::Credentials::load(
+        Some(Credentials::load(
             profile,
             options
                 .get_one::<PathBuf>("credentials-mount")
@@ -636,7 +634,7 @@ fn read_json<T: serde::de::DeserializeOwned>(path: Option<&PathBuf>) -> Result<T
     serde_json::from_str(text).map_err(|_| Failure::Input("invalid JSON input shape"))
 }
 
-fn write_line(output: &mut impl Write, value: &Value) -> Result<(), Failure> {
+pub(crate) fn write_line(output: &mut impl Write, value: &Value) -> Result<(), Failure> {
     serde_json::to_writer(&mut *output, value).map_err(|_| Failure::Output)?;
     output
         .write_all(b"\n")
@@ -680,7 +678,7 @@ fn session_result_expectations_match_exact_fields_after_transport_validation() {
     assert_eq!(call.expect_result, Some(Value::Null));
 }
 
-fn uncertain_write(effect: Effect, failure: Failure) -> Failure {
+pub(crate) fn uncertain_write(effect: Effect, failure: Failure) -> Failure {
     if matches!(effect, Effect::Special | Effect::Write)
         && matches!(
             failure,
