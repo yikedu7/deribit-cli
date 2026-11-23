@@ -190,7 +190,7 @@ fn command(legacy_testnet: bool) -> Command {
                 .value_parser(clap::value_parser!(PathBuf))
                 .global(true)
                 .requires("authenticate")
-                .help("Absolute path of an existing 1Password .env FIFO mount"),
+                .help("Absolute path of an existing 1Password .env FIFO mount (Testnet only)"),
         )
         .arg(credential_variable("client-id-variable"))
         .arg(credential_variable("client-secret-variable"))
@@ -279,13 +279,6 @@ fn run_command(
     output: &mut impl Write,
 ) -> Result<(), Failure> {
     let (command, options) = matches.subcommand().expect("required subcommand");
-    if command == "catalog" {
-        return output
-            .write_all(CATALOG_JSON.as_bytes())
-            .map_err(|_| Failure::Output);
-    }
-    let catalog = Catalog::load();
-    let continue_read_errors = command == "session" && options.get_flag("continue-read-errors");
     let permissions = Permissions {
         authenticate: options.get_flag("authenticate"),
         allow_write: options.get_flag("allow-write"),
@@ -297,6 +290,13 @@ fn run_command(
             "--allow-mainnet-write requires --env mainnet",
         ));
     }
+    if command == "catalog" {
+        return output
+            .write_all(CATALOG_JSON.as_bytes())
+            .map_err(|_| Failure::Output);
+    }
+    let catalog = Catalog::load();
+    let continue_read_errors = command == "session" && options.get_flag("continue-read-errors");
     let requested = options.get_one::<String>("scope");
     let mainnet_scope = if profile == Profile::Mainnet && permissions.authenticate {
         Some(Scope::request(requested.ok_or(Failure::Input(
@@ -497,7 +497,7 @@ fn apply_auth_scope(params: &mut Map<String, Value>, requested: Option<&String>)
 
 fn validate_call(catalog: &Catalog, permissions: &Permissions, call: &Call) -> Result<(), Failure> {
     let method = catalog.method(&call.method).ok_or(Failure::Input(
-        "method is absent from the pinned Production catalog",
+        "method is absent from the pinned Deribit API catalog",
     ))?;
     if !method
         .transports

@@ -1,6 +1,5 @@
 #![forbid(unsafe_code)]
 
-#[path = "testnet/mod.rs"]
 mod api;
 
 use std::{env, process};
@@ -14,7 +13,9 @@ fn main() {
         Some("--help" | "-h") if args.next().is_none() => {
             let exit = deribit_cli::application::run_stdio(env::args_os());
             if exit.code() == 0 {
-                println!("\nAPI catalog and WebSocket commands: deribit-cli api --help");
+                println!(
+                    "\nAPI catalog and WebSocket commands\n  deribit-cli api --env <mainnet|testnet> <COMMAND>\n  deribit-cli api --help\n  deribit-cli testnet --help  (compatibility command for Testnet)"
+                );
             }
             exit.code()
         }

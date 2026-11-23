@@ -12,20 +12,20 @@ fn run(args: &[&str]) -> std::process::Output {
 }
 
 #[test]
-fn catalog_preserves_v1_and_indexes_pinned_production() {
+fn catalog_preserves_v1_and_is_shared_by_both_profiles_and_the_alias() {
     let v1 = run(&["coverage"]);
-    let v2 = run(&["testnet", "catalog"]);
+    let legacy_catalog = run(&["testnet", "catalog"]);
     for profile in ["mainnet", "testnet"] {
         let common = run(&["api", "--env", profile, "catalog"]);
         assert!(common.status.success());
-        assert_eq!(common.stdout, v2.stdout);
+        assert_eq!(common.stdout, legacy_catalog.stdout);
     }
-    assert!(v1.status.success() && v2.status.success());
+    assert!(v1.status.success() && legacy_catalog.status.success());
     let v1: Value = serde_json::from_slice(&v1.stdout).unwrap();
-    let v2: Value = serde_json::from_slice(&v2.stdout).unwrap();
-    let methods = v2["methods"].as_array().unwrap();
+    let catalog: Value = serde_json::from_slice(&legacy_catalog.stdout).unwrap();
+    let methods = catalog["methods"].as_array().unwrap();
     assert_eq!(methods.len(), 187);
-    assert_eq!(v2["channels"].as_array().unwrap().len(), 43);
+    assert_eq!(catalog["channels"].as_array().unwrap().len(), 43);
     assert_eq!(v1["methods"].as_array().unwrap().len(), 38);
     for row in v1["methods"].as_array().unwrap() {
         assert!(methods.iter().any(|method| method["method"] == row["api_method"] && method["v1_cli"].is_string()));
@@ -37,6 +37,26 @@ fn catalog_preserves_v1_and_indexes_pinned_production() {
             .count(),
         38
     );
+}
+
+#[test]
+fn help_distinguishes_explicit_profile_selection_from_the_testnet_alias() {
+    for flag in ["-h", "--help"] {
+        let top = run(&[flag]);
+        assert!(top.status.success());
+        let help = String::from_utf8(top.stdout).unwrap();
+        assert!(help.contains("deribit-cli api --env <mainnet|testnet>"));
+        assert!(help.contains("deribit-cli testnet --help"));
+    }
+    let api = run(&["api", "--help"]);
+    let testnet = run(&["testnet", "--help"]);
+    assert!(api.status.success() && testnet.status.success());
+    let api = String::from_utf8(api.stdout).unwrap();
+    let testnet = String::from_utf8(testnet.stdout).unwrap();
+    assert!(api.contains("--env") && api.contains("mainnet, testnet"));
+    assert!(api.contains("--allow-mainnet-write"));
+    assert!(testnet.contains("fixed to official Deribit Testnet"));
+    assert!(!testnet.contains("--env") && !testnet.contains("--allow-mainnet-write"));
 }
 
 #[test]
@@ -58,6 +78,20 @@ fn profile_selection_and_mainnet_action_gates_fail_before_network() {
         (
             &["testnet", "--env", "mainnet", "catalog"],
             "unexpected argument",
+        ),
+        (
+            &[
+                "api",
+                "--env",
+                "testnet",
+                "--allow-mainnet-write",
+                "catalog",
+            ],
+            "--allow-mainnet-write requires --env mainnet",
+        ),
+        (
+            &["api", "--env", "mainnet", "rpc", "public/unknown"],
+            "absent from the pinned Deribit API catalog",
         ),
         (
             &[
@@ -140,28 +174,42 @@ fn profile_selection_and_mainnet_action_gates_fail_before_network() {
 }
 
 #[test]
-fn a_testnet_only_credential_injection_does_not_enter_mainnet_auth() {
-    let output = Command::new(env!("CARGO_BIN_EXE_deribit-cli"))
-        .args([
-            "api",
-            "--env",
-            "mainnet",
-            "--authenticate",
-            "--scope",
-            "connection account:read",
-            "rpc",
-            "private/get_account_summary",
-        ])
-        .env_clear()
-        .env("DERIBIT_TESTNET_CLIENT_ID", "fixture-test-id")
-        .env("DERIBIT_TESTNET_CLIENT_SECRET", "fixture-test-secret")
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(2));
-    assert!(output.stdout.is_empty());
-    let diagnostic = String::from_utf8(output.stderr).unwrap();
-    assert!(diagnostic.contains("selected profile's credentials"));
-    assert!(!diagnostic.contains("fixture-test"));
+fn credentials_from_the_other_profile_do_not_enter_auth() {
+    for (profile, wrong_profile_prefix) in [
+        ("mainnet", "DERIBIT_TESTNET"),
+        ("testnet", "DERIBIT_MAINNET"),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_deribit-cli"))
+            .args([
+                "api",
+                "--env",
+                profile,
+                "--authenticate",
+                "--scope",
+                "connection account:read",
+                "rpc",
+                "private/get_account_summary",
+            ])
+            .env_clear()
+            .env(
+                format!("{wrong_profile_prefix}_CLIENT_ID"),
+                "fixture-test-id",
+            )
+            .env(
+                format!("{wrong_profile_prefix}_CLIENT_SECRET"),
+                "fixture-test-secret",
+            )
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{profile}");
+        assert!(output.stdout.is_empty());
+        let diagnostic = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            diagnostic.contains("selected profile's credentials"),
+            "{profile}"
+        );
+        assert!(!diagnostic.contains("fixture-test"));
+    }
 }
 
 #[test]

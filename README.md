@@ -4,7 +4,7 @@ A Rust CLI for Deribit and an agent skill for public market data and options ana
 
 Current release: v0.1.0.
 
-Query market data directly from your terminal, or let an agent compose CLI calls to build option chains and find contracts nearest a target Delta. No API keys required.
+Query market data directly from your terminal, or let an agent compose CLI calls to build option chains and find contracts nearest a target Delta. Public market-data queries require no API keys.
 
 ## v0.1.0 features
 
@@ -26,9 +26,9 @@ Supported release targets:
 
 Use the attached `SHA256SUMS` file to verify the download.
 
-## Build from source
+## Build the v1 public CLI from source
 
-Rust 1.85 or newer is required.
+Rust 1.85 or newer is required. Run these commands from the repository root. The binary is `target/release/deribit-cli` with the default Cargo target directory.
 
 ```sh
 cargo build --release --locked
@@ -60,21 +60,35 @@ JSON is the default output format. Successful responses retain the JSON-RPC enve
 
 ## General API CLI (source build)
 
-The separate `deribit-cli-api` source build produces a `deribit-cli` binary with the original public commands and an `api` command for the shared JSON-RPC and WebSocket catalog. The root package and published v0.1.0 archives remain read-only.
+Build the `deribit-cli-api` crate from a repository checkout to get the original public commands plus `api` for the shared JSON-RPC and WebSocket catalog. Its manifest is at `api-cli/Cargo.toml`. Update build scripts that used `testnet-v2/Cargo.toml` to use this path. The root Cargo package and published v0.1.0 archives contain the public CLI.
+
+Both builds produce an executable named `deribit-cli` (`deribit-cli.exe` on Windows). The command below puts the general API build in its own Cargo target directory. Invoke that binary by path to select it.
 
 ```sh
-cargo build --release --locked --manifest-path testnet-v2/Cargo.toml
-cli=./testnet-v2/target/release/deribit-cli
-"$cli" api --env testnet catalog
-"$cli" api --env mainnet rpc public/get_time
-"$cli" api --env testnet rpc public/get_time
+cargo build --release --locked --manifest-path api-cli/Cargo.toml --target-dir api-cli/target
+cli=./api-cli/target/release/deribit-cli
 ```
 
-`api` requires `--env mainnet` or `--env testnet`. The profiles use the fixed official WebSocket endpoints at `www.deribit.com` and `test.deribit.com` respectively. A failed request stays on the selected profile. The `testnet` alias selects Testnet for existing scripts.
+Help and catalog inspection are local and require no credentials. Use `api --help` to identify the general API build. The `coverage` command still reports the 38 public methods.
 
-Public reads need no credentials. For private calls, `--authenticate` reads the selected profile’s variables from the process environment. Mainnet uses `DERIBIT_MAINNET_CLIENT_ID` and `DERIBIT_MAINNET_CLIENT_SECRET`. Testnet defaults to `DERIBIT_TESTNET_CLIENT_ID` and `DERIBIT_TESTNET_CLIENT_SECRET`. Mainnet authentication also requires an explicit `--scope`, for example `connection account:read`, and the CLI checks the granted scope before private calls. Write calls require `--allow-write`, Mainnet writes additionally require `--allow-mainnet-write`, and special actions require `--allow-special`. Deribit authorizes each operation.
+```sh
+"$cli" api --help
+"$cli" api --env mainnet catalog
+"$cli" api --env testnet catalog
+"$cli" testnet catalog
+```
 
-The catalog contains 187 RPC methods and 43 WebSocket channel templates. Recorded Testnet runs verified 145/187 RPC methods, including 37/37 Trading methods, and received subscription acknowledgments for 41/43 templates and events for 27/43. These totals cover the tested scenarios for each method or template. Mainnet private and write paths were checked with offline fixtures.
+With dependencies cached, run the general API suite offline. It uses local fixtures and loopback servers.
+
+```sh
+cargo test --offline --locked --all-targets --manifest-path api-cli/Cargo.toml --target-dir api-cli/target
+```
+
+`api` requires `--env mainnet` or `--env testnet`. The profiles use the fixed official WebSocket endpoints at `www.deribit.com` and `test.deribit.com` respectively. A failed request stays on the selected profile. The general API binary also supports the legacy `testnet` command, which always selects Testnet.
+
+Public reads need no credentials. For private calls, `--authenticate` reads the selected profile’s variables from the process environment. Mainnet uses `DERIBIT_MAINNET_CLIENT_ID` and `DERIBIT_MAINNET_CLIENT_SECRET`. Testnet defaults to `DERIBIT_TESTNET_CLIENT_ID` and `DERIBIT_TESTNET_CLIENT_SECRET`. The credential-variable overrides and FIFO mount are available only for Testnet. Mainnet authentication also requires an explicit `--scope`, for example `connection account:read`, and the CLI checks the granted scope before private calls. Write calls require `--allow-write`, Mainnet writes additionally require `--allow-mainnet-write`, and special actions require `--allow-special`. Deribit authorizes each operation.
+
+The catalog contains 187 RPC methods and 43 WebSocket channel templates. Its `testnet_prerequisite` fields describe the setup needed to validate entries on Testnet. Recorded Testnet runs verified 145/187 RPC methods, including 37/37 Trading methods, and received subscription acknowledgments for 41/43 templates and events for 27/43. These totals cover the tested scenarios for each method or template. Mainnet private and write paths were checked with offline fixtures.
 
 ## Agent skill
 
