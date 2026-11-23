@@ -13,6 +13,8 @@ mod api_application;
 #[cfg(feature = "general-api")]
 mod api_catalog;
 #[cfg(feature = "general-api")]
+mod api_commands;
+#[cfg(feature = "general-api")]
 mod api_policy;
 pub mod application;
 pub mod cli;

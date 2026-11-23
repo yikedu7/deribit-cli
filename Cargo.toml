@@ -12,6 +12,7 @@ documentation = "https://docs.rs/deribit-cli"
 include = [
     "assets/api-method-manifest-v1.json",
     "assets/api-catalog.json",
+    "assets/api-testnet-coverage.json",
     "Cargo.lock",
     "Cargo.toml",
     "LICENSE",

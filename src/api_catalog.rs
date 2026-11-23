@@ -1,8 +1,74 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
+use clap::ArgMatches;
 use serde::Deserialize;
+use serde_json::Value;
+
+use crate::ManifestRegistry;
+use crate::api_application::Failure;
+use crate::api_commands::named_command;
 
 pub(crate) const CATALOG_JSON: &str = include_str!("../assets/api-catalog.json");
+
+const TESTNET_COVERAGE: &str = include_str!("../assets/api-testnet-coverage.json");
+
+#[derive(Deserialize)]
+struct TestnetCoverage {
+    as_of: String,
+    rpc_verified: BTreeSet<String>,
+    subscription_acknowledged: BTreeSet<String>,
+    subscription_event_received: BTreeSet<String>,
+}
+
+pub(crate) fn inspect(registry: &ManifestRegistry, options: &ArgMatches) -> Result<Value, Failure> {
+    let mut catalog: Value = serde_json::from_str(CATALOG_JSON).expect("embedded API catalog");
+    let coverage: TestnetCoverage =
+        serde_json::from_str(TESTNET_COVERAGE).expect("embedded Testnet coverage");
+    catalog["testnet_evidence_as_of"] = Value::String(coverage.as_of.clone());
+    for row in catalog["methods"].as_array_mut().expect("catalog methods") {
+        let method = row["method"].as_str().expect("method name");
+        let verified = coverage.rpc_verified.contains(method);
+        if let Some(command) = named_command(registry, method) {
+            row["cli_command"] = serde_json::json!(command);
+        }
+        row["testnet_verified"] = Value::Bool(verified);
+    }
+    for row in catalog["channels"]
+        .as_array_mut()
+        .expect("catalog channels")
+    {
+        let template = row["channel"].as_str().expect("channel template");
+        let acknowledged = coverage.subscription_acknowledged.contains(template);
+        let event = coverage.subscription_event_received.contains(template);
+        row["testnet_acknowledged"] = Value::Bool(acknowledged);
+        row["testnet_event_received"] = Value::Bool(event);
+    }
+    let (rows, field, name, missing) = match options.subcommand() {
+        None => return Ok(catalog),
+        Some(("method", options)) => (
+            "methods",
+            "method",
+            options.get_one::<String>("method").unwrap(),
+            "method is absent from the pinned Deribit API catalog",
+        ),
+        Some(("channel", options)) => (
+            "channels",
+            "channel",
+            options.get_one::<String>("channel").unwrap(),
+            "channel template is absent from the pinned Deribit API catalog",
+        ),
+        _ => unreachable!("only declared catalog commands are accepted"),
+    };
+    let mut row = catalog[rows]
+        .as_array_mut()
+        .expect("catalog entries")
+        .iter_mut()
+        .find(|entry| entry[field].as_str() == Some(name))
+        .map(Value::take)
+        .ok_or(Failure::Input(missing))?;
+    row["testnet_evidence_as_of"] = Value::String(coverage.as_of);
+    Ok(row)
+}
 
 #[derive(Deserialize)]
 pub(crate) struct Catalog {

@@ -10,12 +10,14 @@ use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use clap::{Arg, ArgAction, ArgMatches, Command, ValueEnum};
+use clap::{ArgMatches, ValueEnum};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use thiserror::Error;
 
-use crate::api_catalog::{CATALOG_JSON, Catalog, Effect};
+use crate::ManifestRegistry;
+use crate::api_catalog::{Catalog, Effect, inspect};
+use crate::api_commands::{command, friendly_call, validate_known_parameters};
 use crate::api_policy::{Scope, is_mainnet_action};
 use crate::configuration::Environment;
 use crate::websocket_transport::{Credentials, Session};
@@ -93,6 +95,16 @@ pub(crate) struct Call {
     expect_result: Option<Value>,
 }
 
+impl Call {
+    pub(crate) fn new(method: &str, params: Map<String, Value>) -> Self {
+        Self {
+            method: method.to_owned(),
+            params,
+            expect_result: None,
+        }
+    }
+}
+
 fn deserialize_expected_result<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<Value>, D::Error> {
@@ -118,112 +130,22 @@ struct Authentication<'a> {
     mainnet_scope: Option<Scope<'a>>,
 }
 
-fn command(legacy_testnet: bool) -> Command {
-    let command = if legacy_testnet {
-        Command::new("testnet")
-            .bin_name("deribit-cli testnet")
-            .about("Compatibility entry point fixed to official Deribit Testnet")
-    } else {
-        Command::new("api")
-            .bin_name("deribit-cli api")
-            .about("Use the pinned catalog over WebSocket with an explicit Deribit environment")
-            .arg(
-                Arg::new("env")
-                    .long("env")
-                    .required(true)
-                    .value_parser(clap::value_parser!(Environment))
-                    .help("Select the fixed official Deribit endpoint"),
-            )
-            .arg(switch(
-                "allow-mainnet-write",
-                "Allow explicitly requested Mainnet actions",
-            ))
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OutputMode {
+    Response,
+    Stream,
+}
+
+/// Runs the domain commands and the exact RPC entry point.
+pub(crate) fn run(args: impl IntoIterator<Item = OsString>) -> i32 {
+    let registry = match ManifestRegistry::embedded() {
+        Ok(registry) => registry,
+        Err(_) => {
+            eprintln!("could not load the embedded CLI manifest");
+            return 70;
+        }
     };
-    command
-        .subcommand_required(true)
-        .arg_required_else_help(true)
-        .arg(
-            Arg::new("timeout-seconds")
-                .long("timeout-seconds")
-                .value_parser(clap::value_parser!(u64).range(1..=300))
-                .default_value("15")
-                .global(true)
-                .help("Deadline per connection attempt and RPC"),
-        )
-        .arg(switch("authenticate", "Use credentials for the selected profile"))
-        .arg(
-            Arg::new("scope")
-                .long("scope")
-                .global(true)
-                .requires("authenticate")
-                .help("Requested authentication scope, required on Mainnet"),
-        )
-        .arg(
-            Arg::new("credentials-mount")
-                .long("credentials-mount")
-                .value_parser(clap::value_parser!(PathBuf))
-                .global(true)
-                .requires("authenticate")
-                .help("Absolute path of an existing 1Password .env FIFO mount (Testnet only)"),
-        )
-        .arg(credential_variable("client-id-variable"))
-        .arg(credential_variable("client-secret-variable"))
-        .arg(switch("allow-write", "Allow explicitly requested writes"))
-        .arg(switch("allow-special", "Allow explicitly authorized special actions"))
-        .subcommand(Command::new("catalog").about("Print the pinned API and subscription matrix"))
-        .subcommand(
-            Command::new("rpc")
-                .about("Call one exact JSON-RPC method over WebSocket")
-                .arg(Arg::new("method").required(true))
-                .arg(
-                    Arg::new("params-file")
-                        .long("params-file")
-                        .value_parser(clap::value_parser!(PathBuf))
-                        .conflicts_with("params-stdin"),
-                )
-                .arg(Arg::new("params-stdin").long("params-stdin").action(ArgAction::SetTrue)),
-        )
-        .subcommand(
-            Command::new("session")
-                .about("Execute a JSON array of RPC and observe steps on one WebSocket")
-                .arg(Arg::new("file").long("file").value_parser(clap::value_parser!(PathBuf)))
-                .arg(
-                    Arg::new("continue-read-errors").long("continue-read-errors")
-                        .action(ArgAction::SetTrue)
-                        .help("Continue after a server error for independent read-only calls"),
-                ),
-        )
-        .subcommand(
-            Command::new("subscribe")
-                .about("Subscribe to concrete channels and stream JSON-RPC notifications as JSON lines")
-                .arg(Arg::new("channel").required(true).num_args(1..))
-                .arg(
-                    Arg::new("observe-seconds")
-                        .long("observe-seconds")
-                        .value_parser(clap::value_parser!(u64).range(1..=300))
-                        .default_value("10"),
-                ),
-        )
-}
-
-fn switch(name: &'static str, help: &'static str) -> Arg {
-    Arg::new(name)
-        .long(name)
-        .global(true)
-        .action(ArgAction::SetTrue)
-        .help(help)
-}
-
-fn credential_variable(name: &'static str) -> Arg {
-    Arg::new(name)
-        .long(name)
-        .global(true)
-        .help("Select a supported Testnet credential variable name")
-}
-
-/// Run the common command family from the binary entrypoint.
-pub fn run(args: impl IntoIterator<Item = OsString>, legacy_testnet: bool) -> i32 {
-    let matches = match command(legacy_testnet).try_get_matches_from(args) {
+    let matches = match command(&registry).try_get_matches_from(args) {
         Ok(matches) => matches,
         Err(error) => {
             let code = if error.use_stderr() { 2 } else { 0 };
@@ -231,15 +153,8 @@ pub fn run(args: impl IntoIterator<Item = OsString>, legacy_testnet: bool) -> i3
             return code;
         }
     };
-    let profile = if legacy_testnet {
-        Environment::Testnet
-    } else {
-        *matches
-            .get_one::<Environment>("env")
-            .expect("required profile")
-    };
     let mut output = io::stdout().lock();
-    match run_command(profile, matches, legacy_testnet, &mut output) {
+    match run_command(&registry, &matches, &mut output) {
         Ok(()) => 0,
         Err(error) => {
             eprintln!("{error}");
@@ -249,31 +164,31 @@ pub fn run(args: impl IntoIterator<Item = OsString>, legacy_testnet: bool) -> i3
 }
 
 fn run_command(
-    profile: Environment,
-    matches: ArgMatches,
-    legacy_testnet: bool,
+    registry: &ManifestRegistry,
+    matches: &ArgMatches,
     output: &mut impl Write,
 ) -> Result<(), Failure> {
-    let (command, options) = matches.subcommand().expect("required subcommand");
+    let (group, options) = matches.subcommand().expect("required command group");
+    if group == "catalog" {
+        let row = inspect(registry, options)?;
+        return write_line(output, &row);
+    }
+    let profile = *matches.get_one::<Environment>("env").ok_or(Failure::Input(
+        "network commands require explicit --env mainnet or --env testnet",
+    ))?;
     let permissions = Permissions {
-        authenticate: options.get_flag("authenticate"),
-        allow_write: options.get_flag("allow-write"),
-        allow_special: options.get_flag("allow-special"),
-        allow_mainnet_write: !legacy_testnet && options.get_flag("allow-mainnet-write"),
+        authenticate: matches.get_flag("authenticate"),
+        allow_write: matches.get_flag("allow-write"),
+        allow_special: matches.get_flag("allow-special"),
+        allow_mainnet_write: matches.get_flag("allow-mainnet-write"),
     };
     if profile != Environment::Mainnet && permissions.allow_mainnet_write {
         return Err(Failure::Input(
             "--allow-mainnet-write requires --env mainnet",
         ));
     }
-    if command == "catalog" {
-        return output
-            .write_all(CATALOG_JSON.as_bytes())
-            .map_err(|_| Failure::Output);
-    }
     let catalog = Catalog::load();
-    let continue_read_errors = command == "session" && options.get_flag("continue-read-errors");
-    let requested = options.get_one::<String>("scope");
+    let requested = matches.get_one::<String>("scope");
     let mainnet_scope = if profile == Environment::Mainnet && permissions.authenticate {
         Some(Scope::request(requested.ok_or(Failure::Input(
             "Mainnet authentication requires explicit --scope",
@@ -287,24 +202,7 @@ fn run_command(
         ));
     }
 
-    let mut steps = match command {
-        "rpc" => {
-            let file = options.get_one::<PathBuf>("params-file");
-            let params = if file.is_some() || options.get_flag("params-stdin") {
-                read_json(file)?
-            } else {
-                Map::new()
-            };
-            vec![Step::Rpc(Call {
-                method: options.get_one::<String>("method").unwrap().to_owned(),
-                params,
-                expect_result: None,
-            })]
-        }
-        "session" => read_json(options.get_one::<PathBuf>("file"))?,
-        "subscribe" => subscription_steps(&catalog, options)?,
-        _ => unreachable!("only declared commands are accepted"),
-    };
+    let (mut steps, mode, continue_read_errors) = build_steps(registry, &catalog, group, options)?;
     if steps.is_empty() || steps.len() > 100 {
         return Err(Failure::Input("a session needs between 1 and 100 steps"));
     }
@@ -313,6 +211,7 @@ fn run_command(
         match step {
             Step::Rpc(call) => {
                 validate_call(&catalog, &permissions, call)?;
+                validate_known_parameters(registry, call)?;
                 if profile == Environment::Mainnet {
                     if is_mainnet_action(call, &catalog) && !permissions.allow_mainnet_write {
                         return Err(Failure::Input(
@@ -357,20 +256,20 @@ fn run_command(
     let credentials = if permissions.authenticate {
         Some(Credentials::load(
             profile,
-            options
+            matches
                 .get_one::<PathBuf>("credentials-mount")
                 .map(PathBuf::as_path),
-            options
+            matches
                 .get_one::<String>("client-id-variable")
                 .map(String::as_str),
-            options
+            matches
                 .get_one::<String>("client-secret-variable")
                 .map(String::as_str),
         )?)
     } else {
         None
     };
-    let deadline = Duration::from_secs(*options.get_one::<u64>("timeout-seconds").unwrap());
+    let deadline = Duration::from_secs(*matches.get_one::<u64>("timeout-seconds").unwrap());
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -386,6 +285,7 @@ fn run_command(
                 mainnet_scope,
             },
             steps,
+            mode,
             continue_read_errors,
             output,
         )
@@ -393,14 +293,51 @@ fn run_command(
     })
 }
 
+fn build_steps(
+    registry: &ManifestRegistry,
+    catalog: &Catalog,
+    group: &str,
+    options: &ArgMatches,
+) -> Result<(Vec<Step>, OutputMode, bool), Failure> {
+    if let Some(call) = friendly_call(registry, group, options)? {
+        return Ok((vec![Step::Rpc(call)], OutputMode::Response, false));
+    }
+    let (command, options) = options.subcommand().expect("required subcommand");
+    match (group, command) {
+        ("rpc", "call") => {
+            let file = options.get_one::<PathBuf>("params-file");
+            let params = if file.is_some() || options.get_flag("params-stdin") {
+                read_json(file)?
+            } else {
+                Map::new()
+            };
+            let call = Call::new(options.get_one::<String>("method").unwrap(), params);
+            Ok((vec![Step::Rpc(call)], OutputMode::Response, false))
+        }
+        ("rpc", "session") => Ok((
+            read_json(options.get_one::<PathBuf>("file"))?,
+            OutputMode::Stream,
+            options.get_flag("continue-read-errors"),
+        )),
+        ("stream", "subscribe") => Ok((
+            subscription_steps(catalog, options)?,
+            OutputMode::Stream,
+            false,
+        )),
+        _ => unreachable!("only declared commands are accepted"),
+    }
+}
+
 async fn run_steps<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin>(
     mut session: Session<S>,
     catalog: &Catalog,
     authentication: &Authentication<'_>,
     steps: Vec<Step>,
+    mode: OutputMode,
     continue_read_errors: bool,
     output: &mut impl Write,
 ) -> Result<(), Failure> {
+    let mut discard_notifications = io::sink();
     let explicit_auth =
         matches!(steps.first(), Some(Step::Rpc(call)) if call.method == "public/auth");
     if authentication.enabled && !explicit_auth {
@@ -410,11 +347,18 @@ async fn run_steps<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin>(
         } else {
             apply_auth_scope(&mut params, authentication.requested);
         }
-        let auth = session.authenticate(params, output).await?;
-        // Token fields are already redacted. Emit the granted scope so a
-        // live harness can distinguish permission from server support.
-        write_line(output, &auth)?;
-        if auth.get("error").is_some() {
+        let auth = if mode == OutputMode::Stream {
+            session.authenticate(params, output).await?
+        } else {
+            session
+                .authenticate(params, &mut discard_notifications)
+                .await?
+        };
+        let failed = auth.get("error").is_some();
+        if mode == OutputMode::Stream || failed {
+            write_line(output, &auth)?;
+        }
+        if failed {
             return Err(Failure::Remote);
         }
     }
@@ -428,11 +372,17 @@ async fn run_steps<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin>(
                         scope.check(&call, catalog, session.granted_scope())?;
                     }
                 }
+                let mut notifications = match mode {
+                    OutputMode::Response => &mut discard_notifications as &mut dyn Write,
+                    OutputMode::Stream => output as &mut dyn Write,
+                };
                 let response = if call.method == "public/auth" {
-                    session.authenticate(call.params, output).await?
+                    session
+                        .authenticate(call.params, &mut notifications)
+                        .await?
                 } else {
                     session
-                        .call(&call.method, call.params, method.auth, output)
+                        .call(&call.method, call.params, method.auth, &mut notifications)
                         .await
                         .map_err(|failure| uncertain_write(method.effect, failure))?
                 };

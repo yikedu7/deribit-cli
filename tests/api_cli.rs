@@ -1,36 +1,96 @@
 #![cfg(feature = "general-api")]
 
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
 
 use serde_json::Value;
 
-fn run(args: &[&str]) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_deribit-cli"))
+fn cli() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_deribit-cli"));
+    command.env_clear();
+    command
+}
+
+fn run(args: &[&str]) -> Output {
+    cli().args(args).output().unwrap()
+}
+
+fn run_with_stdin(args: &[&str], input: &str) -> Output {
+    let mut child = cli()
         .args(args)
-        .env_clear()
-        .output()
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
         .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    child.wait_with_output().unwrap()
+}
+
+fn assert_rejected(output: Output, expected: &str, args: &[&str]) -> String {
+    assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
+    assert!(output.stdout.is_empty(), "{args:?}: {output:?}");
+    let diagnostic = String::from_utf8(output.stderr).unwrap();
+    assert!(diagnostic.contains(expected), "{args:?}: {diagnostic}");
+    diagnostic
+}
+
+fn read_json(args: &[&str]) -> Value {
+    let output = run(args);
+    assert!(output.status.success(), "{args:?}: {output:?}");
+    assert!(output.stderr.is_empty(), "{args:?}: {output:?}");
+    serde_json::from_slice(&output.stdout).unwrap()
 }
 
 #[test]
-fn catalog_preserves_v1_and_is_shared_by_both_profiles_and_the_alias() {
-    let v1 = run(&["coverage"]);
-    let legacy_catalog = run(&["testnet", "catalog"]);
-    for profile in ["mainnet", "testnet"] {
-        let common = run(&["api", "--env", profile, "catalog"]);
-        assert!(common.status.success());
-        assert_eq!(common.stdout, legacy_catalog.stdout);
-    }
-    assert!(v1.status.success() && legacy_catalog.status.success());
-    let v1: Value = serde_json::from_slice(&v1.stdout).unwrap();
-    let catalog: Value = serde_json::from_slice(&legacy_catalog.stdout).unwrap();
+fn catalog_is_local_and_preserves_all_v1_mappings() {
+    let v1 = read_json(&["coverage"]);
+    let catalog = read_json(&["catalog"]);
     let methods = catalog["methods"].as_array().unwrap();
+    let channels = catalog["channels"].as_array().unwrap();
     assert_eq!(methods.len(), 187);
-    assert_eq!(catalog["channels"].as_array().unwrap().len(), 43);
+    assert_eq!(channels.len(), 43);
+    assert_eq!(
+        methods
+            .iter()
+            .filter(|row| row["testnet_verified"] == true)
+            .count(),
+        145
+    );
+    assert_eq!(
+        methods
+            .iter()
+            .filter(|row| row["group"] == "Trading" && row["testnet_verified"] == true)
+            .count(),
+        37
+    );
+    assert_eq!(
+        channels
+            .iter()
+            .filter(|row| row["testnet_acknowledged"] == true)
+            .count(),
+        41
+    );
+    assert_eq!(
+        channels
+            .iter()
+            .filter(|row| row["testnet_event_received"] == true)
+            .count(),
+        27
+    );
+    assert!(channels.iter().all(|row| {
+        row["testnet_event_received"] != true || row["testnet_acknowledged"] == true
+    }));
     assert_eq!(v1["methods"].as_array().unwrap().len(), 38);
     for row in v1["methods"].as_array().unwrap() {
-        assert!(methods.iter().any(|method| method["method"] == row["api_method"] && method["v1_cli"].is_string()));
+        assert!(methods.iter().any(|method| {
+            method["method"] == row["api_method"] && method["v1_cli"].is_string()
+        }));
     }
     assert_eq!(
         methods
@@ -39,76 +99,190 @@ fn catalog_preserves_v1_and_is_shared_by_both_profiles_and_the_alias() {
             .count(),
         38
     );
+
+    let ticker = read_json(&["catalog", "method", "public/ticker"]);
+    assert_eq!(
+        ticker["cli_command"],
+        serde_json::json!(["market", "ticker"])
+    );
+    let method = read_json(&["catalog", "method", "private/move_positions"]);
+    assert_eq!(method["method"], "private/move_positions");
+    assert_eq!(method["effect"], "special");
+    assert_eq!(method["testnet_verified"], true);
+    let template = "ticker.(instrument_name).(interval)";
+    let channel = read_json(&["catalog", "channel", template]);
+    assert_eq!(channel["channel"], template);
+    assert_eq!(channel["testnet_acknowledged"], true);
+    for args in [
+        ["catalog", "method", "private/not_a_method"],
+        ["catalog", "channel", "not.a.channel"],
+    ] {
+        let output = run(&args);
+        assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
+        assert!(output.stdout.is_empty(), "{args:?}: {output:?}");
+    }
 }
 
 #[test]
-fn help_distinguishes_explicit_profile_selection_from_the_testnet_alias() {
+fn root_and_command_help_make_domain_and_environment_available_locally() {
     for flag in ["-h", "--help"] {
         let top = run(&[flag]);
-        assert!(top.status.success());
+        assert!(top.status.success(), "{top:?}");
         let help = String::from_utf8(top.stdout).unwrap();
-        assert!(help.contains("deribit-cli api --env <mainnet|testnet>"));
-        assert!(help.contains("deribit-cli testnet --help"));
+        for name in [
+            "public",
+            "market",
+            "orders",
+            "portfolio",
+            "account",
+            "wallet",
+            "stream",
+            "rpc",
+            "catalog",
+            "--env",
+        ] {
+            assert!(help.contains(name), "{name}: {help}");
+        }
     }
-    let api = run(&["api", "--help"]);
-    let testnet = run(&["testnet", "--help"]);
-    assert!(api.status.success() && testnet.status.success());
-    let api = String::from_utf8(api.stdout).unwrap();
-    let testnet = String::from_utf8(testnet.stdout).unwrap();
-    assert!(api.contains("--env") && api.contains("mainnet, testnet"));
-    assert!(api.contains("--allow-mainnet-write"));
-    assert!(testnet.contains("fixed to official Deribit Testnet"));
-    assert!(!testnet.contains("--env") && !testnet.contains("--allow-mainnet-write"));
+    for (args, text) in [
+        (&["market", "ticker", "--help"][..], "--instrument-name"),
+        (&["market", "order-book", "--help"][..], "--depth"),
+        (&["portfolio", "positions", "--help"][..], "--currency"),
+        (&["account", "summary", "--help"][..], "--currency"),
+        (&["wallet", "transfers", "--help"][..], "--currency"),
+        (&["rpc", "call", "--help"][..], "--params-file"),
+        (&["rpc", "session", "--help"][..], "--file"),
+        (&["stream", "subscribe", "--help"][..], "--observe-seconds"),
+    ] {
+        let output = run(args);
+        assert!(output.status.success(), "{args:?}: {output:?}");
+        let help = String::from_utf8(output.stdout).unwrap();
+        assert!(help.contains(text), "{args:?}: {help}");
+    }
+}
+
+#[test]
+fn shell_completion_includes_domain_commands_and_preserves_public() {
+    let args = ["completion", "bash"];
+    let output = run(&args);
+    assert!(output.status.success(), "{args:?}: {output:?}");
+    assert!(output.stderr.is_empty(), "{args:?}: {output:?}");
+    let script = String::from_utf8(output.stdout).unwrap();
+    for word in ["public", "market", "order-book", "--authenticate"] {
+        assert!(script.contains(word), "{word}: {script}");
+    }
+}
+
+#[test]
+fn all_new_network_groups_require_an_explicit_environment() {
+    for args in [
+        &["market", "ticker", "--instrument-name", "BTC-PERPETUAL"][..],
+        &["orders", "list"][..],
+        &["portfolio", "positions", "--currency", "BTC"][..],
+        &["account", "summary", "--currency", "BTC"][..],
+        &["wallet", "transfers", "--currency", "BTC"][..],
+        &["stream", "subscribe", "ticker.BTC-PERPETUAL.100ms"][..],
+        &["rpc", "call", "public/get_time"][..],
+        &["rpc", "session"][..],
+    ] {
+        assert_rejected(run(args), "--env", args);
+    }
+    let args = [
+        "--env",
+        "testnet",
+        "market",
+        "order-book",
+        "--instrument-name",
+        "BTC-PERPETUAL",
+        "--depth",
+        "not-an-integer",
+    ];
+    assert_rejected(run(&args), "--depth", &args);
 }
 
 #[test]
 fn profile_selection_and_mainnet_action_gates_fail_before_network() {
     let cases: &[(&[&str], &str)] = &[
-        (&["api", "rpc", "public/get_time"], "--env"),
-        (&["api", "--env", "staging", "catalog"], "invalid value"),
+        (
+            &["--env", "staging", "rpc", "call", "public/get_time"],
+            "invalid value",
+        ),
         (
             &[
-                "api",
+                "--env",
+                "testnet",
+                "--env",
+                "mainnet",
+                "rpc",
+                "call",
+                "public/get_time",
+            ],
+            "cannot be used multiple times",
+        ),
+        (
+            &[
                 "--env",
                 "mainnet",
                 "--endpoint",
                 "wss://test.deribit.com/ws/api/v2",
-                "catalog",
+                "rpc",
+                "call",
+                "public/get_time",
             ],
             "unexpected argument",
         ),
         (
-            &["testnet", "--env", "mainnet", "catalog"],
-            "unexpected argument",
-        ),
-        (
             &[
-                "api",
                 "--env",
                 "testnet",
                 "--allow-mainnet-write",
-                "catalog",
+                "rpc",
+                "call",
+                "public/get_time",
             ],
             "--allow-mainnet-write requires --env mainnet",
         ),
         (
-            &["api", "--env", "mainnet", "rpc", "public/unknown"],
+            &["--env", "mainnet", "rpc", "call", "public/unknown"],
             "absent from the pinned Deribit API catalog",
         ),
         (
             &[
-                "api",
                 "--env",
                 "mainnet",
                 "--authenticate",
-                "rpc",
-                "private/get_positions",
+                "portfolio",
+                "positions",
             ],
             "explicit --scope",
         ),
         (
             &[
-                "api",
+                "--env",
+                "mainnet",
+                "--authenticate",
+                "--scope",
+                "connection account:read",
+                "portfolio",
+                "positions",
+            ],
+            "scope is insufficient",
+        ),
+        (
+            &[
+                "--env",
+                "mainnet",
+                "--authenticate",
+                "--scope",
+                "connection account:read",
+                "rpc",
+                "call",
+                "private/get_positions",
+            ],
+            "scope is insufficient",
+        ),
+        (
+            &[
                 "--env",
                 "mainnet",
                 "--authenticate",
@@ -117,13 +291,13 @@ fn profile_selection_and_mainnet_action_gates_fail_before_network() {
                 "--allow-write",
                 "--allow-special",
                 "rpc",
+                "call",
                 "private/move_positions",
             ],
             "--allow-mainnet-write",
         ),
         (
             &[
-                "api",
                 "--env",
                 "mainnet",
                 "--authenticate",
@@ -133,13 +307,13 @@ fn profile_selection_and_mainnet_action_gates_fail_before_network() {
                 "--allow-special",
                 "--allow-mainnet-write",
                 "rpc",
+                "call",
                 "private/move_positions",
             ],
             "scope is insufficient",
         ),
         (
             &[
-                "api",
                 "--env",
                 "mainnet",
                 "--authenticate",
@@ -147,31 +321,30 @@ fn profile_selection_and_mainnet_action_gates_fail_before_network() {
                 "connection account:read",
                 "--client-id-variable",
                 "DERIBIT_TEST_CLIENT_ID",
-                "rpc",
-                "private/get_account_summary",
+                "account",
+                "summary",
+                "--currency",
+                "BTC",
             ],
             "dedicated Mainnet",
         ),
         (
             &[
-                "api",
                 "--env",
                 "testnet",
                 "--authenticate",
                 "--client-id-variable",
                 "DERIBIT_MAINNET_CLIENT_ID",
-                "rpc",
-                "private/get_account_summary",
+                "account",
+                "summary",
+                "--currency",
+                "BTC",
             ],
             "matching pair of Testnet",
         ),
     ];
     for (args, expected) in cases {
-        let result = run(args);
-        assert_eq!(result.status.code(), Some(2), "{args:?}");
-        assert!(result.stdout.is_empty());
-        let diagnostic = String::from_utf8(result.stderr).unwrap();
-        assert!(diagnostic.contains(expected), "{args:?}: {diagnostic}");
+        assert_rejected(run(args), expected, args);
     }
 }
 
@@ -181,18 +354,19 @@ fn credentials_from_the_other_profile_do_not_enter_auth() {
         ("mainnet", "DERIBIT_TESTNET"),
         ("testnet", "DERIBIT_MAINNET"),
     ] {
-        let output = Command::new(env!("CARGO_BIN_EXE_deribit-cli"))
-            .args([
-                "api",
-                "--env",
-                profile,
-                "--authenticate",
-                "--scope",
-                "connection account:read",
-                "rpc",
-                "private/get_account_summary",
-            ])
-            .env_clear()
+        let args = [
+            "--env",
+            profile,
+            "--authenticate",
+            "--scope",
+            "connection account:read",
+            "account",
+            "summary",
+            "--currency",
+            "BTC",
+        ];
+        let output = cli()
+            .args(args)
             .env(
                 format!("{wrong_profile_prefix}_CLIENT_ID"),
                 "fixture-test-id",
@@ -203,97 +377,168 @@ fn credentials_from_the_other_profile_do_not_enter_auth() {
             )
             .output()
             .unwrap();
-        assert_eq!(output.status.code(), Some(2), "{profile}");
-        assert!(output.stdout.is_empty());
-        let diagnostic = String::from_utf8(output.stderr).unwrap();
-        assert!(
-            diagnostic.contains("selected profile's credentials"),
-            "{profile}"
-        );
+        let diagnostic = assert_rejected(output, "selected profile's credentials", &args);
         assert!(!diagnostic.contains("fixture-test"));
     }
 }
 
 #[test]
 fn restricts_private_writes_and_subscription_auth_before_network() {
-    for args in [
-        vec!["testnet", "rpc", "private/get_account_summary"],
-        vec!["testnet", "--authenticate", "rpc", "private/buy"],
-        vec![
-            "testnet",
+    let cases: &[(&[&str], &str)] = &[
+        (
+            &["--env", "testnet", "rpc", "call", "private/get_open_orders"],
             "--authenticate",
+        ),
+        (&["--env", "testnet", "orders", "list"], "--authenticate"),
+        (
+            &[
+                "--env",
+                "testnet",
+                "wallet",
+                "transfers",
+                "--currency",
+                "BTC",
+            ],
+            "--authenticate",
+        ),
+        (
+            &[
+                "--env",
+                "testnet",
+                "--authenticate",
+                "rpc",
+                "call",
+                "private/buy",
+            ],
             "--allow-write",
-            "rpc",
-            "private/withdraw",
-        ],
-        vec!["testnet", "subscribe", "user.portfolio.BTC"],
-        vec!["testnet", "subscribe", "ticker.BTC-PERPETUAL.raw"],
-        vec!["testnet", "rpc", "public/unknown"],
-        vec![
-            "testnet",
-            "--endpoint",
-            "wss://www.deribit.com/ws/api/v2",
-            "rpc",
-            "public/get_time",
-        ],
-    ] {
-        let output = run(&args);
-        assert_eq!(output.status.code(), Some(2), "args={args:?}");
-        assert!(output.stdout.is_empty());
+        ),
+        (
+            &[
+                "--env",
+                "testnet",
+                "--authenticate",
+                "--allow-write",
+                "rpc",
+                "call",
+                "private/withdraw",
+            ],
+            "--allow-special",
+        ),
+        (
+            &[
+                "--env",
+                "testnet",
+                "stream",
+                "subscribe",
+                "user.portfolio.BTC",
+            ],
+            "--authenticate",
+        ),
+        (
+            &[
+                "--env",
+                "testnet",
+                "stream",
+                "subscribe",
+                "ticker.BTC-PERPETUAL.raw",
+            ],
+            "--authenticate",
+        ),
+    ];
+    for (args, expected) in cases {
+        assert_rejected(run(args), expected, args);
     }
 }
 
 #[test]
-fn rejects_sensitive_or_ambiguous_inputs_without_echo() {
-    for body in [
-        concat!("{\"client_secret\":", r#""offline-sentinel""#, "}"),
-        r#"{"scope":"offline-sentinel","scope":"connection"}"#,
-    ] {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_deribit-cli"))
-            .args(["testnet", "rpc", "public/get_time", "--params-stdin"])
-            .env_clear()
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .unwrap();
-        child
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(body.as_bytes())
-            .unwrap();
-        let output = child.wait_with_output().unwrap();
-        assert_eq!(output.status.code(), Some(2));
-        assert!(output.stdout.is_empty());
-        assert!(!String::from_utf8_lossy(&output.stderr).contains("offline-sentinel"));
+fn rpc_rejects_sensitive_or_ambiguous_input_without_echo() {
+    let args = [
+        "--env",
+        "testnet",
+        "rpc",
+        "call",
+        "public/get_time",
+        "--params-stdin",
+    ];
+    let sensitive = concat!("{\"client_secret\":", r#""offline-sentinel""#, "}");
+    let duplicated = r#"{"scope":"offline-sentinel","scope":"connection"}"#;
+    for (body, expected) in [(sensitive, "authentication fields"), (duplicated, "JSON")] {
+        let diagnostic = assert_rejected(run_with_stdin(&args, body), expected, &args);
+        assert!(!diagnostic.contains("offline-sentinel"));
     }
+
+    let file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(file.path(), sensitive).unwrap();
+    let file_args = [
+        "--env",
+        "testnet",
+        "rpc",
+        "call",
+        "public/get_time",
+        "--params-file",
+        file.path().to_str().unwrap(),
+    ];
+    let diagnostic = assert_rejected(run(&file_args), "authentication fields", &file_args);
+    assert!(!diagnostic.contains("offline-sentinel"));
+
+    let mut conflicting = file_args.to_vec();
+    conflicting.push("--params-stdin");
+    assert_rejected(run(&conflicting), "cannot be used with", &conflicting);
+
+    let wrong_type_args = [
+        "--env",
+        "testnet",
+        "rpc",
+        "call",
+        "public/get_order_book",
+        "--params-stdin",
+    ];
+    let params = r#"{"instrument_name":"BTC-PERPETUAL","depth":"5"}"#;
+    assert_rejected(
+        run_with_stdin(&wrong_type_args, params),
+        "wrong JSON type",
+        &wrong_type_args,
+    );
 }
 
 #[test]
 fn read_checks_cannot_continue_past_a_write_error() {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_deribit-cli"))
-        .args([
-            "testnet",
-            "--authenticate",
-            "--allow-write",
-            "session",
-            "--continue-read-errors",
-        ])
-        .env_clear()
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+    let args = [
+        "--env",
+        "testnet",
+        "--authenticate",
+        "--allow-write",
+        "rpc",
+        "session",
+        "--continue-read-errors",
+    ];
+    let steps = r#"[{"method":"private/buy"}]"#;
+    let diagnostic = "only independent read calls";
+    assert_rejected(run_with_stdin(&args, steps), diagnostic, &args);
+    let file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(file.path(), steps).unwrap();
+    let mut file_args = args.to_vec();
+    file_args.extend(["--file", file.path().to_str().unwrap()]);
+    assert_rejected(run(&file_args), diagnostic, &file_args);
+}
+
+#[test]
+fn public_keeps_legacy_dispatch_when_a_flag_value_matches_a_new_group() {
+    let empty_dir = tempfile::tempdir().unwrap();
+    let args = [
+        "--env",
+        "testnet",
+        "--params-file",
+        "rpc",
+        "public",
+        "get-time",
+    ];
+    let output = cli()
+        .current_dir(empty_dir.path())
+        .args(args)
+        .output()
         .unwrap();
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(br#"[{"method":"private/buy"}]"#)
-        .unwrap();
-    let output = child.wait_with_output().unwrap();
-    assert_eq!(output.status.code(), Some(2));
-    assert!(output.stdout.is_empty());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("only independent read calls"));
+    assert_eq!(output.status.code(), Some(6), "{output:?}");
+    assert!(output.stdout.is_empty(), "{output:?}");
+    assert!(String::from_utf8_lossy(&output.stderr).contains("rpc"));
 }

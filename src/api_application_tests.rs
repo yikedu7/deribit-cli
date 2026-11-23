@@ -7,8 +7,8 @@ use tokio_tungstenite::{
 };
 
 use super::{
-    Authentication, Call, Catalog, Environment, Failure, Scope, Session, Step, is_mainnet_action,
-    run_steps,
+    Authentication, Call, Catalog, Environment, Failure, OutputMode, Scope, Session, Step,
+    build_steps, command, is_mainnet_action, run_steps,
 };
 
 const FAKE_ACCESS: &str = "fake-main-access";
@@ -92,13 +92,73 @@ fn explicit_scope_cannot_be_widened_by_session_input_or_server() {
 }
 
 #[test]
+fn named_and_raw_commands_build_the_same_typed_requests() {
+    let registry = crate::ManifestRegistry::embedded().unwrap();
+    let catalog = Catalog::load();
+    for (named, method, params, effect_needs_auth) in [
+        (
+            &[
+                "market",
+                "order-book",
+                "--instrument-name",
+                "BTC-PERPETUAL",
+                "--depth",
+                "5",
+            ][..],
+            "public/get_order_book",
+            json!({"instrument_name": "BTC-PERPETUAL", "depth": 5}),
+            false,
+        ),
+        (
+            &["portfolio", "positions", "--currency", "BTC"][..],
+            "private/get_positions",
+            json!({"currency": "BTC"}),
+            true,
+        ),
+    ] {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        serde_json::to_writer(file.as_file(), &params).unwrap();
+        let raw = [
+            "rpc",
+            "call",
+            method,
+            "--params-file",
+            file.path().to_str().unwrap(),
+        ];
+        for args in [named, &raw] {
+            let matches = command(&registry)
+                .try_get_matches_from(
+                    ["deribit-cli", "--env", "testnet"]
+                        .into_iter()
+                        .chain(args.iter().copied()),
+                )
+                .unwrap();
+            let (group, args) = matches.subcommand().unwrap();
+            let (steps, mode, continue_read_errors) =
+                build_steps(&registry, &catalog, group, args).unwrap();
+            assert!(mode == OutputMode::Response && !continue_read_errors);
+            let [Step::Rpc(plan)] = steps.as_slice() else {
+                panic!("expected one request")
+            };
+            assert_eq!(plan.method, method);
+            assert_eq!(Value::Object(plan.params.clone()), params);
+            assert_eq!(
+                catalog.method(&plan.method).unwrap().auth,
+                effect_needs_auth
+            );
+        }
+    }
+}
+
+#[test]
 fn mainnet_dispatch_uses_actual_grant_and_halts_on_profile_or_write_failure() {
     tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-        for (granted, auth_marker, move_marker, expected) in [
-            ("connection trade:read_write", false, false, "scope"),
-            ("connection mainaccount trade:read_write", true, false, "profile"),
-            ("connection mainaccount trade:read_write", false, true, "uncertain"),
-            ("connection mainaccount trade:read_write", false, false, "success"),
+        for (granted, auth_marker, move_marker, expected, mode) in [
+            ("connection trade:read_write", false, false, "scope", OutputMode::Stream),
+            ("connection mainaccount trade:read_write", true, false, "profile", OutputMode::Stream),
+            ("connection mainaccount trade:read_write", false, true, "uncertain", OutputMode::Stream),
+            ("connection mainaccount trade:read_write", false, false, "success", OutputMode::Stream),
+            ("connection mainaccount trade:read_write", false, false, "success", OutputMode::Response),
         ] {
             let (client, server) = duplex(32 * 1024);
             let mut server = WebSocketStream::from_raw_socket(server, Role::Server, None).await;
@@ -128,13 +188,22 @@ fn mainnet_dispatch_uses_actual_grant_and_halts_on_profile_or_write_failure() {
             let mut out = Vec::new();
             let result = run_steps(session, &catalog, &Authentication {
                 enabled: true, requested: None, mainnet_scope: Some(scope)
-            }, vec![Step::Rpc(mov)], false, &mut out).await;
+            }, vec![Step::Rpc(mov)], mode, false, &mut out).await;
             assert!(matches!((expected,result), ("scope",Err(Failure::InsufficientScope))
                 | ("profile",Err(Failure::Protocol)) | ("uncertain",Err(Failure::UncertainWrite))
                 | ("success",Ok(()))));
             let out = String::from_utf8(out).unwrap();
             assert!(!out.contains("fake-main-"));
-            assert_eq!(out.lines().count(), if expected=="profile" { 0 } else if expected=="success" { 2 } else { 1 });
+            let lines = match (expected, mode) {
+                ("profile", _) => 0,
+                ("success", OutputMode::Stream) => 2,
+                _ => 1,
+            };
+            assert_eq!(out.lines().count(), lines);
+            if mode == OutputMode::Response {
+                let response: Value = serde_json::from_str(&out).unwrap();
+                assert_eq!(response["result"], json!({"trades": []}));
+            }
             server.await.unwrap();
         }
     });

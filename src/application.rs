@@ -172,27 +172,50 @@ fn execute_rpc<T: Transport>(
 pub fn run_cli(args: impl IntoIterator<Item = OsString>) -> i32 {
     #[cfg(feature = "general-api")]
     {
-        let mut args = args.into_iter().peekable();
-        let program = args.next();
-        match args.peek().and_then(|arg| arg.to_str()) {
-            Some("api") => crate::api_application::run(args, false),
-            Some("testnet") => crate::api_application::run(args, true),
-            Some("--help" | "-h") => {
-                let flag = args.next();
-                let top_help = args.peek().is_none();
-                let exit = run_stdio(program.into_iter().chain(flag).chain(args));
-                if top_help && exit.code() == 0 {
-                    println!(
-                        "\nAPI catalog and WebSocket commands\n  deribit-cli api --env <mainnet|testnet> <COMMAND>\n  deribit-cli api --help\n  deribit-cli testnet --help  (compatibility command for Testnet)"
-                    );
-                }
-                exit.code()
-            }
-            _ => run_stdio(program.into_iter().chain(args)).code(),
+        let args: Vec<_> = args.into_iter().collect();
+        if is_general_invocation(args.get(1..).unwrap_or_default()) {
+            crate::api_application::run(args)
+        } else {
+            run_stdio(args).code()
         }
     }
     #[cfg(not(feature = "general-api"))]
     run_stdio(args).code()
+}
+
+#[cfg(feature = "general-api")]
+fn is_general_invocation(args: &[OsString]) -> bool {
+    if args.is_empty() || matches!(args, [arg] if arg == "--help" || arg == "-h") {
+        return true;
+    }
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        let Some(arg) = arg.to_str() else {
+            return false;
+        };
+        match arg {
+            // Skip the values of both parsers' root options. A filename equal
+            // to a command group must still be handled by the v1 parser.
+            "--env"
+            | "--timeout"
+            | "--timeout-seconds"
+            | "--scope"
+            | "--credentials-mount"
+            | "--client-id-variable"
+            | "--client-secret-variable"
+            | "--output"
+            | "--table-width"
+            | "--color"
+            | "--params"
+            | "--params-file" => {
+                args.next();
+            }
+            "--" => return false,
+            option if option.starts_with('-') => (),
+            group => return crate::api_commands::is_group(group),
+        }
+    }
+    false
 }
 
 /// Runs the v1 CLI with the process streams and returns its exit classification.
@@ -544,6 +567,8 @@ fn completion_words(registry: &ManifestRegistry) -> Vec<String> {
             }
         }
     }
+    #[cfg(feature = "general-api")]
+    words.extend(crate::api_commands::completion_words(registry));
     words.sort();
     words.dedup();
     words
