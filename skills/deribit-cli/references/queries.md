@@ -5,15 +5,15 @@ These are code snippets selected by the Agent for a task, not new CLI functional
 ## Single Methods
 
 ```sh
-"$DERIBIT_BIN" public get-index-price --index-name btc_usd
-"$DERIBIT_BIN" public ticker --instrument-name BTC-PERPETUAL
-"$DERIBIT_BIN" --timeout 5s public get-order-book --instrument-name BTC-PERPETUAL --depth 5
-"$DERIBIT_BIN" --output table --color never public ticker --instrument-name BTC-PERPETUAL
-"$DERIBIT_BIN" public get-instruments --currency BTC --kind option --expired false
-"$DERIBIT_BIN" public get-expirations --currency BTC --kind option
-"$DERIBIT_BIN" public get-book-summary-by-currency --currency BTC --kind option
-"$DERIBIT_BIN" public get-historical-volatility --currency BTC
-"$DERIBIT_BIN" public get-combo-ids --currency BTC --state active
+"$DERIBIT_BIN" --env mainnet market index-price --index-name btc_usd
+"$DERIBIT_BIN" --env mainnet market ticker --instrument-name BTC-PERPETUAL
+"$DERIBIT_BIN" --env mainnet --timeout-seconds 5 market order-book --instrument-name BTC-PERPETUAL --depth 5
+"$DERIBIT_BIN" --env mainnet --output table --color never market ticker --instrument-name BTC-PERPETUAL
+"$DERIBIT_BIN" --env mainnet market instruments --currency BTC --kind option --expired false
+"$DERIBIT_BIN" --env mainnet market expirations --currency BTC --kind option
+"$DERIBIT_BIN" --env mainnet market book-summary-by-currency --currency BTC --kind option
+"$DERIBIT_BIN" --env mainnet market historical-volatility --currency BTC
+"$DERIBIT_BIN" --env mainnet market combo-ids --currency BTC --state active
 ```
 
 `BTC-PERPETUAL` is only an official naming example; obtain expiring-option identifiers from current metadata and do not reuse stale example names. Obtain the real `combo_id` for combo details from the list.
@@ -23,16 +23,16 @@ These are code snippets selected by the Agent for a task, not new CLI functional
 The following three lines are alternative invocation forms; `order-book-params.json` should contain `{"instrument_name":"BTC-PERPETUAL","depth":5}`.
 
 ```sh
-"$DERIBIT_BIN" --params '{"instrument_name":"BTC-PERPETUAL","depth":5}' public get-order-book
-"$DERIBIT_BIN" --params-file ./order-book-params.json public get-order-book
-printf '%s\n' '{"instrument_name":"BTC-PERPETUAL","depth":5}' | "$DERIBIT_BIN" --params-stdin public get-order-book
+"$DERIBIT_BIN" --env mainnet market order-book --instrument-name BTC-PERPETUAL --depth 5
+"$DERIBIT_BIN" --env mainnet rpc call public/get_order_book --params-file ./order-book-params.json
+printf '%s\n' '{"instrument_name":"BTC-PERPETUAL","depth":5}' | "$DERIBIT_BIN" --env mainnet rpc call public/get_order_book --params-stdin
 ```
 
 Use a separate temporary directory to retain the native response and diagnostics. Check the exit code before reading `.result`; do not pipe the CLI directly into `jq` while ignoring the CLI exit status.
 
 ```sh
 query_dir=$(mktemp -d)
-if "$DERIBIT_BIN" --output json public ticker --instrument-name BTC-PERPETUAL > "$query_dir/response.json" 2> "$query_dir/stderr.txt"; then
+if "$DERIBIT_BIN" --env mainnet market ticker --instrument-name BTC-PERPETUAL > "$query_dir/response.json" 2> "$query_dir/stderr.txt"; then
   jq -e 'if has("error") or (has("result") | not) then error("not a successful RPC response") else .result end' "$query_dir/response.json"
 else
   query_rc=$?
@@ -49,13 +49,13 @@ First convert the user-specified start and end times (including timezone) to Uni
 ```bash
 : "${DERIBIT_START_MS:?set start Unix milliseconds}"
 : "${DERIBIT_END_MS:?set end Unix milliseconds}"
-"$DERIBIT_BIN" public get-funding-rate-history --instrument-name BTC-PERPETUAL --start-timestamp "$DERIBIT_START_MS" --end-timestamp "$DERIBIT_END_MS"
-"$DERIBIT_BIN" public get-volatility-index-data --currency BTC --start-timestamp "$DERIBIT_START_MS" --end-timestamp "$DERIBIT_END_MS" --resolution 3600
+"$DERIBIT_BIN" --env mainnet market funding-rate-history --instrument-name BTC-PERPETUAL --start-timestamp "$DERIBIT_START_MS" --end-timestamp "$DERIBIT_END_MS"
+"$DERIBIT_BIN" --env mainnet market volatility-index-data --currency BTC --start-timestamp "$DERIBIT_START_MS" --end-timestamp "$DERIBIT_END_MS" --resolution 3600
 ```
 
 These are different queries; use whichever is needed. DVOL's `resolution` uses seconds or `1D`; do not apply the candle endpoint's minute-based resolution. Use the response continuation/time range to determine whether another page is needed, and avoid claiming that one result covers the entire historical interval.
 
 ## Two Levels of Option-Chain Detail
 
-- Quote summary only: save one `get-instruments` response and one `get-book-summary-by-currency` response, join them by `instrument_name`, and filter first by the metadata expiration and underlying. Keep contracts with missing market data and their missing status; do not treat missing bid/ask as zero.
+- Quote summary only: save one `instruments` response and one `book-summary-by-currency` response, join them by `instrument_name`, and filter first by the metadata expiration and underlying. Keep contracts with missing market data and their missing status; do not treat missing bid/ask as zero.
 - Greeks/Delta required: use the per-instrument ticker collection in the [option-chain example](options.md). Do not assume that book summary contains Greeks, and do not take only part of the strike range to reduce requests while claiming the closest result across the full chain.

@@ -1,86 +1,72 @@
 # deribit-cli
 
-A read-only Rust CLI and agent skill for Deribit public market data and options analysis.
+A Rust CLI for Deribit market data, account queries, exact JSON-RPC calls, and WebSocket subscriptions.
 
-Current release: v0.1.0.
+The current source build uses one command tree. Named commands and `rpc call` create the same call plan, then share permission checks and one WebSocket execution path. `catalog` and shell completion stay local.
 
-Query market data directly from your terminal, or let an agent compose CLI calls to build option chains and find contracts nearest a target Delta. No API keys required.
+## Install from source
 
-## Features
-
-- 38 public methods covering instruments, tickers, order books, trades, volatility, funding, and published combos.
-- Native JSON-RPC output for scripts and table output for terminal use.
-- Mainnet by default, with explicit Testnet support.
-- An English-language [agent skill](skills/deribit-cli/SKILL.md) with reusable Bash/jq examples for common queries and option analysis.
-- Read-only access: no trading, account access, or private APIs.
-
-## Download
-
-Download the archive for your platform from [GitHub Releases](https://github.com/yikedu7/deribit-cli/releases/latest), extract it, and place `deribit-cli` (or `deribit-cli.exe` on Windows) on your `PATH`.
-
-Supported release targets:
-
-- macOS: Apple Silicon and Intel
-- Linux: x86-64 and ARM64
-- Windows: x86-64
-
-Use the attached `SHA256SUMS` file to verify the download.
-
-## Build from source
-
-Rust 1.85 or newer is required.
+Rust 1.85 or newer is required. From the repository root:
 
 ```sh
 cargo build --release --locked
+cli=./target/release/deribit-cli
 ```
 
-The repository contains the product unit tests plus public CLI, manifest-correspondence, and read-only security tests:
+The executable is `deribit-cli.exe` on Windows. With the dependency cache available, run the offline suite before publishing a source revision:
 
 ```sh
-cargo test --locked --all-targets
+cargo test --offline --locked --all-targets
 ```
 
-## Quick start
+Published v0.1.0 archives remain the previous read-only release. Rebuild that release only from its release commit and its own `Cargo.lock`; do not treat this source tree as a drop-in replacement for those binaries.
+
+## Commands
+
+Put `--env mainnet` or `--env testnet` before every network command. There is no default environment, endpoint override, or fallback to the other profile.
+
+| Group | Use it for | Example |
+| --- | --- | --- |
+| `market` | Public prices, instruments, order books, and trades | `market ticker --instrument-name BTC-PERPETUAL` |
+| `orders` | Open orders | `orders list` |
+| `portfolio` | Positions and margin | `portfolio positions --currency BTC` |
+| `account` | Account information and announcements | `account summary --currency BTC` |
+| `wallet` | Transfer history | `wallet transfers --currency BTC` |
+| `stream` | Channel subscriptions and events | `stream subscribe ticker.BTC-PERPETUAL.100ms` |
+| `rpc` | Exact methods and ordered steps on one connection | `rpc call public/get_time` |
+| `catalog` | Local method, channel, scope, and evidence lookup | `catalog method private/move_positions` |
 
 ```sh
-deribit-cli version
-deribit-cli coverage
-deribit-cli public get-index-price --index-name btc_usd
-deribit-cli public ticker --instrument-name BTC-PERPETUAL
-deribit-cli --output table public get-order-book --instrument-name BTC-PERPETUAL
-deribit-cli public get-instruments --currency BTC --kind option --expired false
-deribit-cli public --help
+"$cli" --help
+"$cli" catalog method public/ticker
+"$cli" --env testnet market ticker --instrument-name BTC-PERPETUAL
+printf '%s
+' '{"instrument_name":"BTC-PERPETUAL"}' | "$cli" --env testnet rpc call public/ticker --params-stdin
 ```
 
-Mainnet is the default. Add `--env testnet` before `public` to use Deribit Testnet.
+The two ticker commands send the same method and parameters. Use `rpc call` or `rpc session` for methods that do not have a named command, including Mass Quote, Block Trade, and position moves. Add a named command only after its workflow, parameter contract, and focused tests are explicit.
 
-Place global options before `public` and method parameters after the method name. Use `deribit-cli public <method> --help` for supported parameters.
+## Authentication and safety
 
-JSON is the default output format. Successful responses retain the JSON-RPC envelope, with data in `.result`. Check the exit status and `.error` before processing results; use `--output table` only for human-readable output. Each invocation makes one request, with no automatic retries or pagination.
+Public reads need no credentials. Private calls require `--authenticate`. Mainnet credentials are `DERIBIT_MAINNET_CLIENT_ID` and `DERIBIT_MAINNET_CLIENT_SECRET`; Testnet defaults to `DERIBIT_TESTNET_CLIENT_ID` and `DERIBIT_TESTNET_CLIENT_SECRET`. Credential-variable overrides and the 1Password FIFO mount are Testnet-only.
+
+Mainnet authentication also requires an explicit `--scope`, such as `connection account:read`. The CLI checks the granted scope before dispatch. Writes require `--allow-write`, Mainnet actions also require `--allow-mainnet-write`, and special actions require `--allow-special`. These switches authorize the request; Deribit still authorizes the account.
+
+If a write is sent and the connection fails before its outcome is known, the command exits without retry. Reconcile that profile before sending another write. A session is ordered: earlier successful steps stay applied when a later step fails.
+
+## Output
+
+A single call prints one redacted JSON-RPC response by default. `--output table` renders a named query for reading; API errors remain JSON. `stream subscribe` and `rpc session` print JSON Lines. Subscription acknowledgements and later events are separate lines. Diagnostics go to stderr.
+
+Exit codes are `0` success, `2` usage, `3` input, `4` API error, `5` connection or protocol failure, `6` local I/O, `70` internal failure, and `124` timeout or an uncertain write.
+
+## Local catalog
+
+`catalog`, help, and `completion bash|zsh|fish` do not open a connection or read credentials. The catalog contains 187 RPC methods and 43 channel templates. It keeps the official method group, while `cli_command` records the named command when one exists. `testnet_verified`, `testnet_acknowledged`, and `testnet_event_received` describe historical Testnet evidence only. The recorded snapshot verified 145/187 methods, including 37/37 Trading methods, and received acknowledgements for 41/43 channel templates and events for 27/43.
 
 ## Agent skill
 
-The repository includes a [deribit-cli skill](skills/deribit-cli/SKILL.md) that teaches an agent how to discover available commands, combine queries, and interpret results. The agent handles composition; the CLI remains a set of public-data primitives, with no additional analysis commands or dedicated analysis runtime.
-
-To use it:
-
-1. Install the CLI from the release downloads above, or build it from source.
-2. Point your agent's skill loader at `skills/deribit-cli`, or install that complete directory using your agent's supported skill-installation mechanism. Keep its `references` and `agents` subdirectories together with `SKILL.md`.
-3. Ask your agent to use the `deribit-cli` skill for a public market-data query. The reference snippets use Bash and `jq`; agents can use other available JSON-processing tools.
-
-Example requests:
-
-- "Show the BTC perpetual ticker and top five order-book levels."
-- "List the available BTC option expirations on mainnet."
-- "For this exact expiry, find the five BTC puts closest to Delta -0.25 and report missing data and the collection window."
-
-Option analysis uses exact expiration metadata and signed Delta distance. Per-instrument responses are collected in a single batch and then analyzed without refreshing individual winners; the batch is not a simultaneous exchange snapshot.
-
-See [common query examples](skills/deribit-cli/references/queries.md) and [option-chain and Delta examples](skills/deribit-cli/references/options.md) for adaptable code. The skill is included in the source repository, not in the standalone binary archives.
-
-## Scope and safety
-
-The v0.1.0 command set covers 38 Deribit public market-data methods. It is read-only, does not accept credentials, and does not expose trading, account, or private API methods.
+The [deribit-cli skill](skills/deribit-cli/SKILL.md) uses the same command tree for public market data and option analysis. It does not authorize account access or trading. Point an agent at the complete `skills/deribit-cli` directory so `SKILL.md`, `references`, and `agents` stay together.
 
 ## License
 

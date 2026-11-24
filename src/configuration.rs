@@ -11,7 +11,7 @@ use url::Url;
 
 use crate::errors::CoreError;
 
-/// The only endpoints allowed by the frozen v1 contract.
+/// The official Deribit environments.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum Environment {
     #[default]
@@ -25,6 +25,13 @@ impl Environment {
         match self {
             Self::Mainnet => "mainnet",
             Self::Testnet => "testnet",
+        }
+    }
+
+    pub(crate) const fn websocket_endpoint(self) -> &'static str {
+        match self {
+            Self::Mainnet => "wss://www.deribit.com/ws/api/v2",
+            Self::Testnet => "wss://test.deribit.com/ws/api/v2",
         }
     }
 

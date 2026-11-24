@@ -36,6 +36,16 @@ impl NativeResponse {
         }
     }
 
+    /// Classifies one already redacted JSON-RPC envelope for presentation.
+    pub(crate) fn from_json(value: Value) -> Self {
+        let kind = if value.get("error").is_some() {
+            NativeKind::ApiError
+        } else {
+            NativeKind::Success
+        };
+        Self { kind, value }
+    }
+
     /// Returns the immutable response classification.
     pub const fn kind(&self) -> NativeKind {
         self.kind

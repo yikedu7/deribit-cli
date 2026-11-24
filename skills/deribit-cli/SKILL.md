@@ -5,52 +5,45 @@ description: Use deribit-cli to query Deribit public market data, instruments, o
 
 # Deribit Public Market Data
 
-Use the existing Rust CLI to obtain official public data; the Agent combines calls and analyzes them according to the user's question. All access is read-only and unauthenticated; do not read, request, or forward credentials. This Skill provides operating instructions and examples; it does not add CLI subcommands or a dedicated analysis runtime.
+Use the installed `deribit-cli` for official public data. Keep every call in this skill read-only and unauthenticated. Do not add `--authenticate`, write switches, credentials, or private methods for market analysis.
+
+Network commands require an explicit environment before the command group.
 
 ## Locate the CLI
 
-- Prefer the executable found by `command -v deribit-cli` and record its absolute path as `DERIBIT_BIN`.
-- If it is not in PATH, resolve this Skill's real source directory (following discovery links); the repository is two levels above it. Check that repository's `target/release/deribit-cli` and `target/debug/deribit-cli`; do not rely on the current task's working directory.
-- Run `"$DERIBIT_BIN" version` and `"$DERIBIT_BIN" coverage` to confirm the version, snapshot, and available commands. These entry points read only local metadata and do not access the network. The repository-built snapshot/hash must match its embedded manifest; do not trust a stale build based only on its filename.
-- If no usable binary exists, run `cargo build --locked --offline` in the owning repository using the toolchain specified by `rust-toolchain.toml`, then use the debug binary. First check `cargo --version` and `rustc --version`; an old Homebrew tool in PATH may bypass rustup. Use `rustup which --toolchain 1.85.0 cargo` to locate the installed pinned toolchain (use the version in the repository file), put the returned path's parent first in PATH for this build, and ensure Cargo, rustc, and Cargo subcommands come from the same toolchain. `rustup run` alone may still invoke an old subcommand from PATH. If offline dependencies or the toolchain are missing, report what is missing and do not automatically install a toolchain. Do not assume crates.io has published the package or automatically download an unknown package with the same name.
-- `jq` is an optional JSON-processing tool used only in reference examples; if it is unavailable, the Agent should use data-processing capabilities already present in the environment. Do not automatically add Python or other project dependencies to run the Skill.
+- Prefer `command -v deribit-cli` and record its absolute path as `DERIBIT_BIN`.
+- If it is absent from `PATH`, resolve this skill's real directory and check `target/release/deribit-cli` and `target/debug/deribit-cli` two levels above it.
+- Run `"$DERIBIT_BIN" --version` and `"$DERIBIT_BIN" catalog method public/ticker`. Both are local and do not use the network.
+- Build with `cargo build --locked --offline` only in the owning repository and only with the toolchain named by `rust-toolchain.toml`. Do not install a toolchain or download a package automatically when one is missing.
 
-## Choose Queries
+## Choose the Command
 
-First confirm supported methods with `coverage`, then read `public <method> --help` as needed. Do not duplicate the full 38-method catalog, to avoid drifting from the installed version.
-
-| User intent | Existing command entry points |
+| User intent | Command |
 | --- | --- |
-| Index, ticker, order book | `get-index-price`, `ticker`, `get-order-book` |
-| Instruments, expiries | `get-instruments`, `get-expirations` |
-| Option market summary | `get-book-summary-by-currency`, joined to metadata by instrument |
-| Option chains, Greeks, target Delta | Read [option workflow and examples](references/options.md) as needed |
-| DVOL, historical volatility | `get-volatility-index-data`, `get-historical-volatility` |
-| Perpetual funding | `get-funding-rate-history`, `get-funding-rate-value` |
-| Published combos | `get-combos`, `get-combo-ids`, `get-combo-details` |
+| Index, ticker, order book | `market index-price`, `market ticker`, `market order-book` |
+| Instruments and expiries | `market instruments`, `market expirations` |
+| Option market summary | `market book-summary-by-currency` |
+| Option chains and Delta | Read [option workflow](references/options.md) |
+| DVOL and historical volatility | `market volatility-index-data`, `market historical-volatility` |
+| Perpetual funding | `market funding-rate-history`, `market funding-rate-value` |
+| Published combos | `market combos`, `market combo-ids`, `market combo-details` |
 
-All of these methods are in the `public` command group. [Common query examples](references/queries.md) provide parameter entry points, historical ranges, and error-handling examples; read them only for relevant queries.
+Confirm an unfamiliar flag with `"$DERIBIT_BIN" market <command> --help`. Use `catalog method <official/method>` to see its official group, scope, and whether a named command exists. Do not copy a stale 38-method list into the answer.
 
-## Essential Call Rules
+## Call Rules
 
-- The full form is `deribit-cli [GLOBAL_OPTIONS] public <method> [PARAM_FLAGS]`. Put `--env`, `--output`, `--timeout`, and `--params*` before `public`; put method parameters after the method name.
-- The defaults are mainnet, JSON, and a 10-second timeout. When the user specifies testnet, switch the entire batch and label the environment; never mix data from the two environments.
-- Convert official underscores to hyphens in method names and flags; retain official underscores in JSON keys. Preserve parameter-value case and instrument identifiers exactly.
-- When using JSON input, choose exactly one parameter entry point: `--params`, `--params-file`, or `--params-stdin`; do not combine it with method parameter flags. Pass a parameter object, not a JSON-RPC envelope.
-- Write boolean parameters explicitly as `true` or `false`; use the units stated by help for time parameters, with current timestamp parameters in Unix milliseconds. Omitting an optional parameter delegates to the upstream default.
-- Retain the complete JSON-RPC envelope for successful JSON, with data in `.result`; do not treat every JSON value on stdout as success. API errors also go to stdout and diagnostics to stderr; check the process exit code and `.error` first.
-- Exit codes: `0` success (possibly empty); `2` usage; `3` JSON input; `4` API; `5` transport/protocol; `6` local I/O; `70` internal error; `124` timeout. Retain stdout/stderr on failure; do not mask failure with an empty array.
-- Each CLI call makes one request, with no automatic pagination or retry. The Agent combines calls only within the explicit scope needed for the user's task and estimates request volume; on rate limits, network errors, or timeouts, stop the batch and report the completed portion, without unbounded retries. Advance pagination explicitly using the method's official cursor, sequence, or time parameters, stopping at the requested range or when the cursor does not advance.
-- Always use JSON for machine processing. `--output table` is for human reading only; do not parse tables for subsequent calculations.
+- The form is `deribit-cli --env mainnet|testnet [OUTPUT] market <command> [FLAGS]`.
+- There is no implicit environment. Keep one batch entirely on the environment the user requested.
+- JSON is the default. `--output table` is for a person to read; do not parse it.
+- Put global options before `market` and method flags after the command. Official method names use underscores, while command and flag names use hyphens.
+- A command makes one request. It does not retry or advance pagination automatically.
+- Check the exit status before reading `.result`. Exit `0` can still be an empty result. Exit `4` means the response contains an API error. Exit `5` is connection or protocol failure, and `124` is a timeout.
+- On a rate limit, network error, or timeout, stop the batch and report the completed portion.
 
-## Combined Analysis and Result Interpretation
+## Combined Analysis
 
-First clarify necessary conditions that change the query (underlying, exact expiry, signed target Delta; Call/Put is optional), then choose the rest from context. Do not treat a natural-language underlying directly as the API `currency`: it may belong to USDC-settled contracts, for example. Use metadata such as `get-instruments --currency any --kind option` to confirm the instrument and base/quote/settlement currencies.
+Resolve a natural-language underlying through instrument metadata before choosing `currency`. Filter a target Delta with `abs(delta - target_delta)` and preserve the sign. Interpret an unqualified “25 Delta Put” as `-0.25` and say that explicitly.
 
-Filter Delta with `abs(delta - target_delta)` and retain the Delta sign; do not use `abs(abs(delta) - abs(target))`. When the user says only “25 Delta Put,” explicitly state that it is interpreted as `-0.25`; if the user gives a positive target with a Put condition, retain the target and do not silently change its sign.
+Collect one batch, record its environment and start and finish times, then freeze the raw responses. Do not refresh individual winners and mix them back into the batch. Match an expiry with `expiration_timestamp`; do not substitute a nearby date. Preserve missing values as unknown, and do not rank contracts without a numeric Delta.
 
-Use a single batch collected instrument by instrument: record the environment, collection start and end times, each ticker timestamp, and the filtering criteria. Once collection is complete, freeze the raw responses; reuse the same batch for aggregation, sorting, and display, and do not refresh winners separately and mix them into the batch. State that these are data from the collection window, not an exchange snapshot taken at one instant. Treat any later refresh as a new batch.
-
-Match expiration exactly using the contract metadata's `expiration_timestamp`; when the user gives a date, first confirm its corresponding UTC expiration date, and do not substitute the nearest expiration. Zero matches are a normal empty result. Preserve missing/null fields as unknown rather than filling them with zero; contracts without a numeric Delta do not participate in ranking, and report the number and reasons for omissions. If a request fails, report only the partial collection status and do not claim a chain-wide optimum.
-
-Results include the source, environment, data time/collection window, filtering criteria, candidate count/missing items, and necessary units. Preserve the official meanings of fields such as price, IV, Greeks, and open interest; do not directly compare different settlement currencies without conversion, and mark units as unknown when uncertain. Clearly label derived results as Agent analysis rather than presenting them as native API responses.
+Label prices, IV, Greeks, and open interest with their official units. Do not compare different settlement currencies without a conversion. Mark derived ranking or aggregation as analysis rather than exchange output.

@@ -1,4 +1,6 @@
-//! Core contracts for the frozen Deribit public-read v1 snapshot.
+//! Deribit CLI core. The product binary has one command tree and plans every
+//! named or raw call before opening its WebSocket. The embedded manifest still
+//! supplies the typed public-read parameter contract.
 //!
 //! The signed S2 modules preserve the pure-core boundary: immutable manifest
 //! registry, policy validation, configuration, runtime limits, error
@@ -8,6 +10,10 @@
 
 #![forbid(unsafe_code)]
 
+mod api_application;
+mod api_catalog;
+mod api_commands;
+mod api_policy;
 pub mod application;
 pub mod cli;
 pub mod commands;
@@ -24,7 +30,9 @@ pub mod rpc;
 pub mod runtime;
 pub mod table_profiles;
 pub mod transport;
+mod websocket_transport;
 
+pub use api_commands::command as product_command;
 pub use application::{
     ApplicationError, ProcessExit, ProcessOutput, execute_public, render_public_result,
     render_table_result, run_parsed_with_transport, run_process,

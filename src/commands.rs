@@ -120,7 +120,7 @@ pub fn build_cli(registry: &ManifestRegistry) -> Result<Command, CoreError> {
         ))
 }
 
-fn parameter_arg(parameter: ParameterDescriptor<'_>) -> Arg {
+pub(crate) fn parameter_arg(parameter: ParameterDescriptor<'_>) -> Arg {
     let long = parameter.flag().trim_start_matches("--").to_owned();
     let value_parser = parameter_value_parser(parameter);
     Arg::new(parameter.name().to_owned())

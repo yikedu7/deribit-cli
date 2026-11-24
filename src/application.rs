@@ -168,6 +168,28 @@ fn execute_rpc<T: Transport>(
     Ok(NativeResponse::from_rpc(request.parse_response(response)?))
 }
 
+/// Runs the one product command tree and returns its process exit code.
+pub fn run_cli(args: impl IntoIterator<Item = OsString>) -> i32 {
+    crate::api_application::run(args)
+}
+
+/// Runs the v1 CLI with the process streams and returns its exit classification.
+pub fn run_stdio(args: impl IntoIterator<Item = OsString>) -> ProcessExit {
+    let stdin = io::stdin();
+    let stdin_is_terminal = stdin.is_terminal();
+    let output = run_process(args, &mut stdin.lock(), stdin_is_terminal);
+    let mut stdout = io::stdout().lock();
+    let mut stderr = io::stderr().lock();
+    match output.write_to(&mut stdout, &mut stderr) {
+        Ok(()) => output.exit(),
+        Err(error) => {
+            let fallback = local_io_failure(&error);
+            let _ = fallback.write_to(&mut stdout, &mut stderr);
+            ProcessExit::LocalIo
+        }
+    }
+}
+
 /// Parses argv using the embedded registry and runs the product adapter.
 pub fn run_process<I, T>(args: I, stdin: &mut dyn Read, stdin_is_terminal: bool) -> ProcessOutput
 where
@@ -447,7 +469,7 @@ impl<'a> VersionMetadata<'a> {
     }
 }
 
-fn completion_script(registry: &ManifestRegistry, shell: CompletionShell) -> String {
+pub(crate) fn completion_script(registry: &ManifestRegistry, shell: CompletionShell) -> String {
     let words = completion_words(registry).join(" ");
     match shell {
         CompletionShell::Bash => format!(
@@ -463,46 +485,7 @@ fn completion_script(registry: &ManifestRegistry, shell: CompletionShell) -> Str
 }
 
 fn completion_words(registry: &ManifestRegistry) -> Vec<String> {
-    let mut words = vec![
-        "public".into(),
-        "coverage".into(),
-        "version".into(),
-        "completion".into(),
-        "bash".into(),
-        "zsh".into(),
-        "fish".into(),
-        "--output".into(),
-        "--table-width".into(),
-        "--color".into(),
-        "--env".into(),
-        "--timeout".into(),
-        "--params".into(),
-        "--params-file".into(),
-        "--params-stdin".into(),
-        "--help".into(),
-        "--version".into(),
-        "json".into(),
-        "table".into(),
-        "mainnet".into(),
-        "testnet".into(),
-    ];
-    for operation in registry.operations() {
-        if let Some(method_command) = operation.command_tokens().get(1) {
-            words.push(method_command.clone());
-        }
-        for parameter in operation.parameters() {
-            words.push(parameter.flag().to_owned());
-            for value in parameter.enum_values() {
-                words.push(match value {
-                    Value::String(value) => value.clone(),
-                    value => value.to_string(),
-                });
-            }
-        }
-    }
-    words.sort();
-    words.dedup();
-    words
+    crate::api_commands::completion_words(registry)
 }
 
 /// Helper for the process entry point to classify stream-write failures.

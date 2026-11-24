@@ -35,8 +35,8 @@ batch_dir=$(mktemp -d)
 printf 'batch_dir=%s\n' "$batch_dir"
 batch_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 jq -n --arg started "$batch_started" --arg env "$option_env" --arg currency "$DERIBIT_CURRENCY" --arg base "$DERIBIT_BASE" --arg quote "$DERIBIT_QUOTE" --arg settlement "$DERIBIT_SETTLEMENT" --arg side "$option_side" --argjson expiry "$DERIBIT_EXPIRY_MS" '{environment:$env, started_at:$started, simultaneous:false, status:"collecting", filters:{currency:$currency,base_currency:$base,quote_currency:$quote,settlement_currency:$settlement,expiration_timestamp:$expiry,option_type:$side}}' > "$batch_dir/batch.json"
-"$DERIBIT_BIN" version > "$batch_dir/version.json"
-if "$DERIBIT_BIN" --env "$option_env" --output json public get-instruments --currency "$DERIBIT_CURRENCY" --kind option --expired false > "$batch_dir/instruments.json" 2> "$batch_dir/instruments.stderr"; then
+"$DERIBIT_BIN" --version > "$batch_dir/version.txt"
+if "$DERIBIT_BIN" --env "$option_env" market instruments --currency "$DERIBIT_CURRENCY" --kind option --expired false > "$batch_dir/instruments.json" 2> "$batch_dir/instruments.stderr"; then
   jq -e 'has("result") and (has("error") | not) and (.result | type == "array")' "$batch_dir/instruments.json" >/dev/null
 else
   batch_rc=$?
@@ -50,7 +50,7 @@ mkdir "$batch_dir/tickers"
 batch_i=0
 while IFS= read -r instrument; do
   batch_i=$((batch_i + 1))
-  if "$DERIBIT_BIN" --env "$option_env" --output json public ticker --instrument-name "$instrument" > "$batch_dir/tickers/$batch_i.json" 2> "$batch_dir/tickers/$batch_i.stderr"; then
+  if "$DERIBIT_BIN" --env "$option_env" market ticker --instrument-name "$instrument" > "$batch_dir/tickers/$batch_i.json" 2> "$batch_dir/tickers/$batch_i.stderr"; then
     jq -e --arg instrument "$instrument" '(has("error") | not) and (.result | type == "object") and (.result.instrument_name == $instrument) and (.result.timestamp | type == "number")' "$batch_dir/tickers/$batch_i.json" >/dev/null
   else
     batch_rc=$?

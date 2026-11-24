@@ -1,36 +1,44 @@
 use std::collections::HashSet;
 
-use deribit_cli::{
-    CommandCorrespondence, ManifestRegistry, build_cli, validate_command_correspondence,
-};
+use deribit_cli::{ManifestRegistry, product_command};
 
 #[test]
-fn manifest_and_dynamic_cli_have_exact_correspondence() {
+fn product_tree_has_one_named_command_surface() {
     let registry = ManifestRegistry::embedded().unwrap();
-    let command = build_cli(&registry).unwrap();
-    let public = command
+    let command = product_command(&registry);
+    let root_names = command
         .get_subcommands()
-        .find(|subcommand| subcommand.get_name() == "public")
-        .unwrap();
-    let cli_commands = public
-        .get_subcommands()
-        .map(|subcommand| format!("public {}", subcommand.get_name()))
+        .map(|subcommand| subcommand.get_name())
         .collect::<HashSet<_>>();
-    let manifest_commands = registry
-        .operations()
-        .map(|operation| operation.canonical_command().to_owned())
-        .collect::<HashSet<_>>();
-    assert_eq!(cli_commands.len(), 38);
-    assert_eq!(cli_commands, manifest_commands);
+    assert_eq!(
+        root_names,
+        HashSet::from([
+            "market",
+            "orders",
+            "portfolio",
+            "account",
+            "wallet",
+            "stream",
+            "rpc",
+            "catalog",
+            "completion",
+        ])
+    );
 
-    let bindings = registry
-        .operations()
-        .map(|operation| {
-            let method_command = public
-                .get_subcommands()
-                .find(|subcommand| subcommand.get_name() == operation.command_tokens()[1])
-                .unwrap();
-            let actual_flags = method_command
+    let mut public_methods = HashSet::new();
+    let mut named = Vec::new();
+    for group_name in ["market", "orders", "portfolio", "account", "wallet"] {
+        let group = command.find_subcommand(group_name).unwrap();
+        for child in group.get_subcommands() {
+            named.push(format!("{group_name} {}", child.get_name()));
+            let Some(operation) = registry.operations().find(|operation| {
+                let token = operation.command_tokens()[1].as_str();
+                token == child.get_name() || token.strip_prefix("get-") == Some(child.get_name())
+            }) else {
+                continue;
+            };
+            public_methods.insert(operation.method().to_owned());
+            let actual_flags = child
                 .get_arguments()
                 .filter_map(|argument| argument.get_long())
                 .map(|long| format!("--{long}"))
@@ -40,23 +48,20 @@ fn manifest_and_dynamic_cli_have_exact_correspondence() {
                 .map(|parameter| parameter.flag().to_owned())
                 .collect::<HashSet<_>>();
             assert_eq!(actual_flags, expected_flags, "{}", operation.method());
-            CommandCorrespondence::new(operation.operation_id(), operation.canonical_command())
-        })
-        .collect::<Vec<_>>();
-    validate_command_correspondence(&registry, &bindings).unwrap();
-
-    let root_names = command
-        .get_subcommands()
-        .map(|subcommand| subcommand.get_name())
-        .collect::<HashSet<_>>();
-    assert_eq!(
-        root_names,
-        HashSet::from(["public", "coverage", "version", "completion"])
-    );
-    assert!(command.get_arguments().all(|argument| {
-        !matches!(
-            argument.get_long(),
-            Some("method" | "endpoint" | "url" | "retry" | "all")
-        )
-    }));
+        }
+    }
+    assert_eq!(named.len(), 39);
+    assert_eq!(public_methods.len(), 35);
+    for expected in [
+        "market ticker",
+        "orders list",
+        "portfolio positions",
+        "account summary",
+        "wallet transfers",
+    ] {
+        assert!(named.iter().any(|name| name == expected), "{expected}");
+    }
+    assert!(command.find_subcommand("public").is_none());
+    assert!(command.find_subcommand("coverage").is_none());
+    assert!(command.find_subcommand("version").is_none());
 }
