@@ -168,54 +168,9 @@ fn execute_rpc<T: Transport>(
     Ok(NativeResponse::from_rpc(request.parse_response(response)?))
 }
 
-/// Runs the CLI with process streams, including opt-in API commands when built.
+/// Runs the one product command tree and returns its process exit code.
 pub fn run_cli(args: impl IntoIterator<Item = OsString>) -> i32 {
-    #[cfg(feature = "general-api")]
-    {
-        let args: Vec<_> = args.into_iter().collect();
-        if is_general_invocation(args.get(1..).unwrap_or_default()) {
-            crate::api_application::run(args)
-        } else {
-            run_stdio(args).code()
-        }
-    }
-    #[cfg(not(feature = "general-api"))]
-    run_stdio(args).code()
-}
-
-#[cfg(feature = "general-api")]
-fn is_general_invocation(args: &[OsString]) -> bool {
-    if args.is_empty() || matches!(args, [arg] if arg == "--help" || arg == "-h") {
-        return true;
-    }
-    let mut args = args.iter();
-    while let Some(arg) = args.next() {
-        let Some(arg) = arg.to_str() else {
-            return false;
-        };
-        match arg {
-            // Skip the values of both parsers' root options. A filename equal
-            // to a command group must still be handled by the v1 parser.
-            "--env"
-            | "--timeout"
-            | "--timeout-seconds"
-            | "--scope"
-            | "--credentials-mount"
-            | "--client-id-variable"
-            | "--client-secret-variable"
-            | "--output"
-            | "--table-width"
-            | "--color"
-            | "--params"
-            | "--params-file" => {
-                args.next();
-            }
-            "--" => return false,
-            option if option.starts_with('-') => (),
-            group => return crate::api_commands::is_group(group),
-        }
-    }
-    false
+    crate::api_application::run(args)
 }
 
 /// Runs the v1 CLI with the process streams and returns its exit classification.
@@ -514,7 +469,7 @@ impl<'a> VersionMetadata<'a> {
     }
 }
 
-fn completion_script(registry: &ManifestRegistry, shell: CompletionShell) -> String {
+pub(crate) fn completion_script(registry: &ManifestRegistry, shell: CompletionShell) -> String {
     let words = completion_words(registry).join(" ");
     match shell {
         CompletionShell::Bash => format!(
@@ -530,48 +485,7 @@ fn completion_script(registry: &ManifestRegistry, shell: CompletionShell) -> Str
 }
 
 fn completion_words(registry: &ManifestRegistry) -> Vec<String> {
-    let mut words = vec![
-        "public".into(),
-        "coverage".into(),
-        "version".into(),
-        "completion".into(),
-        "bash".into(),
-        "zsh".into(),
-        "fish".into(),
-        "--output".into(),
-        "--table-width".into(),
-        "--color".into(),
-        "--env".into(),
-        "--timeout".into(),
-        "--params".into(),
-        "--params-file".into(),
-        "--params-stdin".into(),
-        "--help".into(),
-        "--version".into(),
-        "json".into(),
-        "table".into(),
-        "mainnet".into(),
-        "testnet".into(),
-    ];
-    for operation in registry.operations() {
-        if let Some(method_command) = operation.command_tokens().get(1) {
-            words.push(method_command.clone());
-        }
-        for parameter in operation.parameters() {
-            words.push(parameter.flag().to_owned());
-            for value in parameter.enum_values() {
-                words.push(match value {
-                    Value::String(value) => value.clone(),
-                    value => value.to_string(),
-                });
-            }
-        }
-    }
-    #[cfg(feature = "general-api")]
-    words.extend(crate::api_commands::completion_words(registry));
-    words.sort();
-    words.dedup();
-    words
+    crate::api_commands::completion_words(registry)
 }
 
 /// Helper for the process entry point to classify stream-write failures.

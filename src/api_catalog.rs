@@ -30,6 +30,10 @@ pub(crate) fn inspect(registry: &ManifestRegistry, options: &ArgMatches) -> Resu
         let verified = coverage.rpc_verified.contains(method);
         if let Some(command) = named_command(registry, method) {
             row["cli_command"] = serde_json::json!(command);
+        } else {
+            row.as_object_mut()
+                .expect("method row")
+                .remove("cli_command");
         }
         row["testnet_verified"] = Value::Bool(verified);
     }

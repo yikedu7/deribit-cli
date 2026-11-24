@@ -17,10 +17,16 @@ use thiserror::Error;
 
 use crate::ManifestRegistry;
 use crate::api_catalog::{Catalog, Effect, inspect};
-use crate::api_commands::{command, friendly_call, validate_known_parameters};
+use crate::api_commands::{
+    command, completion_shell, display, friendly_call, validate_known_parameters,
+};
 use crate::api_policy::{Scope, is_mainnet_action};
+use crate::application::{completion_script, render_table_result};
 use crate::configuration::Environment;
+use crate::presentation::PresentationContext;
+use crate::table_profiles::TableProfile;
 use crate::websocket_transport::{Credentials, Session};
+use crate::{GlobalOptions, OutputFormat};
 
 const INPUT_LIMIT: usize = 1024 * 1024;
 
@@ -36,6 +42,8 @@ impl ValueEnum for Environment {
 
 #[derive(Debug, Error)]
 pub(crate) enum Failure {
+    #[error("{0}")]
+    Usage(&'static str),
     #[error("{0}")]
     Input(&'static str),
     #[error("could not load the selected profile's credentials")]
@@ -65,27 +73,37 @@ pub(crate) enum Failure {
 impl Failure {
     fn code(&self) -> i32 {
         match self {
-            Self::Input(_) | Self::Credentials | Self::InsufficientScope => 2,
-            Self::Remote => 3,
+            Self::Usage(_) => 2,
+            Self::Input(_) | Self::Credentials | Self::InsufficientScope => 3,
+            Self::Remote => 4,
             Self::Output => 6,
-            Self::Timeout => 124,
-            Self::Connect
-            | Self::Connection
-            | Self::Protocol
-            | Self::UncertainWrite
-            | Self::UnexpectedResult => 5,
+            Self::Connect | Self::Connection | Self::Protocol | Self::UnexpectedResult => 5,
+            Self::Timeout | Self::UncertainWrite => 124,
         }
+    }
+
+    fn report(&self) -> String {
+        let class = match self.code() {
+            2 => "usage",
+            3 => "input",
+            4 => "api",
+            5 => "transport",
+            6 => "local-io",
+            124 => "timeout",
+            _ => "internal",
+        };
+        format!("{class}: {self}")
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(untagged)]
 enum Step {
     Rpc(Call),
     Observe(Observation),
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Call {
     pub(crate) method: String,
@@ -111,7 +129,7 @@ fn deserialize_expected_result<'de, D: serde::Deserializer<'de>>(
     Value::deserialize(deserializer).map(Some)
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Observation {
     observe_seconds: u64,
@@ -157,7 +175,7 @@ pub(crate) fn run(args: impl IntoIterator<Item = OsString>) -> i32 {
     match run_command(&registry, &matches, &mut output) {
         Ok(()) => 0,
         Err(error) => {
-            eprintln!("{error}");
+            eprintln!("{}", error.report());
             error.code()
         }
     }
@@ -169,11 +187,22 @@ fn run_command(
     output: &mut impl Write,
 ) -> Result<(), Failure> {
     let (group, options) = matches.subcommand().expect("required command group");
+    if group == "completion" {
+        let shell = options.get_one::<String>("shell").unwrap();
+        output
+            .write_all(completion_script(registry, completion_shell(shell)).as_bytes())
+            .map_err(|_| Failure::Output)?;
+        return Ok(());
+    }
+    let display = display(matches)?;
     if group == "catalog" {
+        if display.output == OutputFormat::Table {
+            return Err(Failure::Usage("catalog output is always JSON"));
+        }
         let row = inspect(registry, options)?;
         return write_line(output, &row);
     }
-    let profile = *matches.get_one::<Environment>("env").ok_or(Failure::Input(
+    let profile = *matches.get_one::<Environment>("env").ok_or(Failure::Usage(
         "network commands require explicit --env mainnet or --env testnet",
     ))?;
     let permissions = Permissions {
@@ -183,26 +212,31 @@ fn run_command(
         allow_mainnet_write: matches.get_flag("allow-mainnet-write"),
     };
     if profile != Environment::Mainnet && permissions.allow_mainnet_write {
-        return Err(Failure::Input(
+        return Err(Failure::Usage(
             "--allow-mainnet-write requires --env mainnet",
         ));
     }
     let catalog = Catalog::load();
     let requested = matches.get_one::<String>("scope");
     let mainnet_scope = if profile == Environment::Mainnet && permissions.authenticate {
-        Some(Scope::request(requested.ok_or(Failure::Input(
+        Some(Scope::request(requested.ok_or(Failure::Usage(
             "Mainnet authentication requires explicit --scope",
         ))?)?)
     } else {
         None
     };
     if mainnet_scope.as_ref().is_some_and(Scope::is_named) && !permissions.allow_mainnet_write {
-        return Err(Failure::Input(
+        return Err(Failure::Usage(
             "Mainnet named sessions require --allow-mainnet-write",
         ));
     }
 
     let (mut steps, mode, continue_read_errors) = build_steps(registry, &catalog, group, options)?;
+    if mode == OutputMode::Stream && display.output == OutputFormat::Table {
+        return Err(Failure::Usage(
+            "stream and session output is always JSON Lines",
+        ));
+    }
     if steps.is_empty() || steps.len() > 100 {
         return Err(Failure::Input("a session needs between 1 and 100 steps"));
     }
@@ -214,12 +248,12 @@ fn run_command(
                 validate_known_parameters(registry, call)?;
                 if profile == Environment::Mainnet {
                     if is_mainnet_action(call, &catalog) && !permissions.allow_mainnet_write {
-                        return Err(Failure::Input(
+                        return Err(Failure::Usage(
                             "Mainnet action requires explicit --allow-mainnet-write",
                         ));
                     }
                     if call.method == "public/fork_token" && !permissions.allow_special {
-                        return Err(Failure::Input(
+                        return Err(Failure::Usage(
                             "token forking requires --allow-special on Mainnet",
                         ));
                     }
@@ -230,13 +264,13 @@ fn run_command(
                     apply_auth_scope(&mut call.params, requested);
                 }
                 if call.method == "private/logout" && index + 1 != step_count {
-                    return Err(Failure::Input(
+                    return Err(Failure::Usage(
                         "private/logout must be the last session step",
                     ));
                 }
             }
             Step::Observe(observation) if !(1..=300).contains(&observation.observe_seconds) => {
-                return Err(Failure::Input("observe_seconds must be between 1 and 300"));
+                return Err(Failure::Usage("observe_seconds must be between 1 and 300"));
             }
             Step::Observe(_) => {}
         }
@@ -249,7 +283,7 @@ fn run_command(
             Step::Observe(_) => true,
         })
     {
-        return Err(Failure::Input(
+        return Err(Failure::Usage(
             "--continue-read-errors accepts only independent read calls",
         ));
     }
@@ -274,23 +308,110 @@ fn run_command(
         .enable_all()
         .build()
         .map_err(|_| Failure::Connect)?;
-    runtime.block_on(async {
+    let table_steps = if mode == OutputMode::Response && display.output == OutputFormat::Table {
+        Some(steps.clone())
+    } else {
+        None
+    };
+    let rendered = runtime.block_on(async {
         let session = Session::connect(profile, deadline, credentials).await?;
-        run_steps(
-            session,
-            &catalog,
-            &Authentication {
-                enabled: permissions.authenticate,
-                requested,
-                mainnet_scope,
-            },
-            steps,
-            mode,
-            continue_read_errors,
+        let mut captured = Vec::new();
+        if mode == OutputMode::Response && display.output == OutputFormat::Table {
+            run_steps(
+                session,
+                &catalog,
+                &Authentication {
+                    enabled: permissions.authenticate,
+                    requested,
+                    mainnet_scope,
+                },
+                steps.clone(),
+                mode,
+                continue_read_errors,
+                &mut captured,
+            )
+            .await?;
+        } else {
+            run_steps(
+                session,
+                &catalog,
+                &Authentication {
+                    enabled: permissions.authenticate,
+                    requested,
+                    mainnet_scope,
+                },
+                steps,
+                mode,
+                continue_read_errors,
+                output,
+            )
+            .await?;
+        }
+        Ok::<_, Failure>(captured)
+    })?;
+    if mode == OutputMode::Response && display.output == OutputFormat::Table {
+        render_named_table(
+            registry,
+            table_steps.as_deref().expect("table steps"),
+            profile,
+            &display,
+            &rendered,
             output,
-        )
-        .await
-    })
+        )?;
+    }
+    Ok(())
+}
+
+fn render_named_table(
+    registry: &ManifestRegistry,
+    steps: &[Step],
+    profile: Environment,
+    display: &crate::api_commands::Display,
+    bytes: &[u8],
+    output: &mut impl Write,
+) -> Result<(), Failure> {
+    let Step::Rpc(call) = steps.first().expect("a response has one call") else {
+        unreachable!("table rendering applies only to one RPC response")
+    };
+    let response: Value = serde_json::from_slice(bytes).map_err(|_| Failure::Protocol)?;
+    let operation = registry
+        .operations()
+        .find(|operation| operation.method() == call.method);
+    let table_profile =
+        TableProfile::from_manifest(operation.and_then(|operation| operation.table_profile_id()))
+            .unwrap_or(TableProfile::Generic);
+    let operation_name = operation
+        .map(|operation| operation.command_tokens()[1].clone())
+        .unwrap_or_else(|| call.method.clone());
+    let context = PresentationContext::from_process(
+        operation_name,
+        table_profile,
+        Some(profile.as_str()),
+        GlobalOptions {
+            output: display.output,
+            table_width: display.table_width,
+            color: display.color,
+        },
+        io::stdout().is_terminal(),
+    );
+    let rendered = render_table_result(Ok(crate::NativeResponse::from_json(response)), context);
+    output
+        .write_all(rendered.stdout())
+        .and_then(|_| {
+            let diagnostic = rendered.stderr();
+            if diagnostic.is_empty() {
+                Ok(())
+            } else {
+                io::stderr().write_all(diagnostic)
+            }
+        })
+        .and_then(|_| output.flush())
+        .map_err(|_| Failure::Output)?;
+    match rendered.exit().code() {
+        0 => Ok(()),
+        4 => Err(Failure::Remote),
+        _ => Err(Failure::Protocol),
+    }
 }
 
 fn build_steps(
@@ -422,7 +543,7 @@ fn apply_auth_scope(params: &mut Map<String, Value>, requested: Option<&String>)
 }
 
 fn validate_call(catalog: &Catalog, permissions: &Permissions, call: &Call) -> Result<(), Failure> {
-    let method = catalog.method(&call.method).ok_or(Failure::Input(
+    let method = catalog.method(&call.method).ok_or(Failure::Usage(
         "method is absent from the pinned Deribit API catalog",
     ))?;
     if !method
@@ -430,18 +551,18 @@ fn validate_call(catalog: &Catalog, permissions: &Permissions, call: &Call) -> R
         .iter()
         .any(|transport| transport == "websocket")
     {
-        return Err(Failure::Input("method is unavailable over WebSocket"));
+        return Err(Failure::Usage("method is unavailable over WebSocket"));
     }
     if method.auth && !permissions.authenticate {
-        return Err(Failure::Input("method requires explicit --authenticate"));
+        return Err(Failure::Usage("method requires explicit --authenticate"));
     }
     if matches!(method.effect, Effect::Write | Effect::Special) && !permissions.allow_write {
-        return Err(Failure::Input("method requires explicit --allow-write"));
+        return Err(Failure::Usage("method requires explicit --allow-write"));
     }
     if (method.effect == Effect::Special || call.method == "public/exchange_token")
         && !permissions.allow_special
     {
-        return Err(Failure::Input("method requires explicit --allow-special"));
+        return Err(Failure::Usage("method requires explicit --allow-special"));
     }
     if [
         "access_token",
@@ -487,12 +608,12 @@ fn validate_call(catalog: &Catalog, permissions: &Permissions, call: &Call) -> R
                 .channel(concrete)
                 .ok_or(Failure::Input("channel is absent from the pinned catalog"))?;
             if channel.auth && !call.method.starts_with("private/") {
-                return Err(Failure::Input(
+                return Err(Failure::Usage(
                     "private channels require private/subscribe or private/unsubscribe",
                 ));
             }
             if channel.auth_for_raw && concrete.ends_with(".raw") && !permissions.authenticate {
-                return Err(Failure::Input(
+                return Err(Failure::Usage(
                     "raw channels require explicit --authenticate",
                 ));
             }
@@ -502,7 +623,7 @@ fn validate_call(catalog: &Catalog, permissions: &Permissions, call: &Call) -> R
         && call.params.get("invalidate_token") != Some(&Value::Bool(false))
         && !permissions.allow_special
     {
-        return Err(Failure::Input(
+        return Err(Failure::Usage(
             "token invalidation requires explicit --allow-special",
         ));
     }
@@ -515,7 +636,7 @@ fn subscription_steps(catalog: &Catalog, options: &ArgMatches) -> Result<Vec<Ste
     for concrete in options.get_many::<String>("channel").unwrap() {
         let row = catalog
             .channel(concrete)
-            .ok_or(Failure::Input("channel is absent from the pinned catalog"))?;
+            .ok_or(Failure::Usage("channel is absent from the pinned catalog"))?;
         let list = if row.auth { &mut private } else { &mut public };
         list.push(Value::String(concrete.to_owned()));
     }
@@ -617,4 +738,24 @@ pub(crate) fn uncertain_write(effect: Effect, failure: Failure) -> Failure {
     } else {
         failure
     }
+}
+
+#[cfg(test)]
+#[test]
+fn product_exit_classes_separate_usage_input_api_and_uncertain_writes() {
+    assert_eq!(Failure::Usage("missing flag").code(), 2);
+    assert_eq!(Failure::Input("invalid JSON input shape").code(), 3);
+    assert_eq!(Failure::Remote.code(), 4);
+    assert_eq!(Failure::Connect.code(), 5);
+    assert_eq!(Failure::Output.code(), 6);
+    assert_eq!(uncertain_write(Effect::Write, Failure::Timeout).code(), 124);
+    assert_eq!(
+        uncertain_write(Effect::Read, Failure::Timeout).code(),
+        Failure::Timeout.code()
+    );
+    assert!(
+        Failure::Input("offline-sentinel")
+            .report()
+            .starts_with("input:")
+    );
 }

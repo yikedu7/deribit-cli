@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT"
 readme = "README.md"
-description = "Read-only CLI for Deribit public market data APIs"
+description = "Deribit CLI for market data, account queries, and WebSocket JSON-RPC"
 repository = "https://github.com/yikedu7/deribit-cli"
 homepage = "https://github.com/yikedu7/deribit-cli"
 documentation = "https://docs.rs/deribit-cli"
@@ -21,20 +21,17 @@ include = [
     "src/**",
 ]
 
-[features]
-general-api = ["dep:aws-lc-rs", "dep:futures-util", "dep:tokio", "dep:tokio-tungstenite"]
-
 [dependencies]
-aws-lc-rs = { version = "1", default-features = false, optional = true }
+aws-lc-rs = { version = "1", default-features = false }
 clap = { version = "4.5", default-features = false, features = ["error-context", "help", "std", "string", "usage"] }
-futures-util = { version = "0.3", default-features = false, features = ["sink", "std"], optional = true }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 tabled = { version = "0.20", default-features = false, features = ["std"] }
 thiserror = "2"
-tokio = { version = "1", features = ["net", "rt", "time"], optional = true }
-tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"], optional = true }
+tokio = { version = "1", features = ["io-util", "net", "rt", "time"] }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
 url = "2"
 uuid = { version = "1", features = ["v4"] }
 

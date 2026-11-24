@@ -1,5 +1,3 @@
-#![cfg(feature = "general-api")]
-
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
@@ -33,7 +31,11 @@ fn run_with_stdin(args: &[&str], input: &str) -> Output {
 }
 
 fn assert_rejected(output: Output, expected: &str, args: &[&str]) -> String {
-    assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
+    assert_rejected_code(output, 2, expected, args)
+}
+
+fn assert_rejected_code(output: Output, code: i32, expected: &str, args: &[&str]) -> String {
+    assert_eq!(output.status.code(), Some(code), "{args:?}: {output:?}");
     assert!(output.stdout.is_empty(), "{args:?}: {output:?}");
     let diagnostic = String::from_utf8(output.stderr).unwrap();
     assert!(diagnostic.contains(expected), "{args:?}: {diagnostic}");
@@ -48,8 +50,7 @@ fn read_json(args: &[&str]) -> Value {
 }
 
 #[test]
-fn catalog_is_local_and_preserves_all_v1_mappings() {
-    let v1 = read_json(&["coverage"]);
+fn catalog_is_local_and_records_named_mappings() {
     let catalog = read_json(&["catalog"]);
     let methods = catalog["methods"].as_array().unwrap();
     let channels = catalog["channels"].as_array().unwrap();
@@ -86,18 +87,16 @@ fn catalog_is_local_and_preserves_all_v1_mappings() {
     assert!(channels.iter().all(|row| {
         row["testnet_event_received"] != true || row["testnet_acknowledged"] == true
     }));
-    assert_eq!(v1["methods"].as_array().unwrap().len(), 38);
-    for row in v1["methods"].as_array().unwrap() {
-        assert!(methods.iter().any(|method| {
-            method["method"] == row["api_method"] && method["v1_cli"].is_string()
-        }));
-    }
     assert_eq!(
         methods
             .iter()
-            .filter(|method| method["v1_cli"].is_string())
+            .filter(|method| {
+                method["cli_command"]
+                    .as_array()
+                    .is_some_and(|command| command.len() == 2)
+            })
             .count(),
-        38
+        39
     );
 
     let ticker = read_json(&["catalog", "method", "public/ticker"]);
@@ -118,7 +117,7 @@ fn catalog_is_local_and_preserves_all_v1_mappings() {
         ["catalog", "channel", "not.a.channel"],
     ] {
         let output = run(&args);
-        assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
+        assert_eq!(output.status.code(), Some(3), "{args:?}: {output:?}");
         assert!(output.stdout.is_empty(), "{args:?}: {output:?}");
     }
 }
@@ -130,7 +129,6 @@ fn root_and_command_help_make_domain_and_environment_available_locally() {
         assert!(top.status.success(), "{top:?}");
         let help = String::from_utf8(top.stdout).unwrap();
         for name in [
-            "public",
             "market",
             "orders",
             "portfolio",
@@ -142,6 +140,7 @@ fn root_and_command_help_make_domain_and_environment_available_locally() {
             "--env",
         ] {
             assert!(help.contains(name), "{name}: {help}");
+            assert!(!help.contains("\n  public"), "{help}");
         }
     }
     for (args, text) in [
@@ -168,7 +167,13 @@ fn shell_completion_includes_domain_commands_and_preserves_public() {
     assert!(output.status.success(), "{args:?}: {output:?}");
     assert!(output.stderr.is_empty(), "{args:?}: {output:?}");
     let script = String::from_utf8(output.stdout).unwrap();
-    for word in ["public", "market", "order-book", "--authenticate"] {
+    for word in [
+        "market",
+        "order-book",
+        "--authenticate",
+        "--output",
+        "completion",
+    ] {
         assert!(script.contains(word), "{word}: {script}");
     }
 }
@@ -344,7 +349,16 @@ fn profile_selection_and_mainnet_action_gates_fail_before_network() {
         ),
     ];
     for (args, expected) in cases {
-        assert_rejected(run(args), expected, args);
+        let code = if expected.contains("insufficient")
+            || expected.contains("credentials")
+            || expected.contains("dedicated Mainnet")
+            || expected.contains("matching pair")
+        {
+            3
+        } else {
+            2
+        };
+        assert_rejected_code(run(args), code, expected, args);
     }
 }
 
@@ -377,7 +391,7 @@ fn credentials_from_the_other_profile_do_not_enter_auth() {
             )
             .output()
             .unwrap();
-        let diagnostic = assert_rejected(output, "selected profile's credentials", &args);
+        let diagnostic = assert_rejected_code(output, 3, "selected profile's credentials", &args);
         assert!(!diagnostic.contains("fixture-test"));
     }
 }
@@ -463,7 +477,7 @@ fn rpc_rejects_sensitive_or_ambiguous_input_without_echo() {
     let sensitive = concat!("{\"client_secret\":", r#""offline-sentinel""#, "}");
     let duplicated = r#"{"scope":"offline-sentinel","scope":"connection"}"#;
     for (body, expected) in [(sensitive, "authentication fields"), (duplicated, "JSON")] {
-        let diagnostic = assert_rejected(run_with_stdin(&args, body), expected, &args);
+        let diagnostic = assert_rejected_code(run_with_stdin(&args, body), 3, expected, &args);
         assert!(!diagnostic.contains("offline-sentinel"));
     }
 
@@ -478,7 +492,7 @@ fn rpc_rejects_sensitive_or_ambiguous_input_without_echo() {
         "--params-file",
         file.path().to_str().unwrap(),
     ];
-    let diagnostic = assert_rejected(run(&file_args), "authentication fields", &file_args);
+    let diagnostic = assert_rejected_code(run(&file_args), 3, "authentication fields", &file_args);
     assert!(!diagnostic.contains("offline-sentinel"));
 
     let mut conflicting = file_args.to_vec();
@@ -494,8 +508,9 @@ fn rpc_rejects_sensitive_or_ambiguous_input_without_echo() {
         "--params-stdin",
     ];
     let params = r#"{"instrument_name":"BTC-PERPETUAL","depth":"5"}"#;
-    assert_rejected(
+    assert_rejected_code(
         run_with_stdin(&wrong_type_args, params),
+        3,
         "wrong JSON type",
         &wrong_type_args,
     );
@@ -523,22 +538,53 @@ fn read_checks_cannot_continue_past_a_write_error() {
 }
 
 #[test]
-fn public_keeps_legacy_dispatch_when_a_flag_value_matches_a_new_group() {
-    let empty_dir = tempfile::tempdir().unwrap();
-    let args = [
+fn removed_entries_have_no_compatibility_dispatch() {
+    for args in [
+        &["public", "get-time"][..],
+        &["coverage"][..],
+        &["version"][..],
+        &["api", "rpc", "public/get_time"][..],
+        &["testnet", "rpc", "public/get_time"][..],
+    ] {
+        assert_rejected(run(args), "unrecognized", args);
+    }
+}
+
+#[test]
+fn named_table_options_follow_the_shared_output_contract() {
+    let missing_env = [
+        "--output",
+        "table",
+        "market",
+        "ticker",
+        "--instrument-name",
+        "BTC-PERPETUAL",
+    ];
+    assert_rejected(run(&missing_env), "--env", &missing_env);
+    let table_without_output = [
         "--env",
         "testnet",
-        "--params-file",
+        "--table-width",
+        "40",
         "rpc",
-        "public",
-        "get-time",
+        "call",
+        "public/get_time",
     ];
-    let output = cli()
-        .current_dir(empty_dir.path())
-        .args(args)
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(6), "{output:?}");
-    assert!(output.stdout.is_empty(), "{output:?}");
-    assert!(String::from_utf8_lossy(&output.stderr).contains("rpc"));
+    assert_rejected(
+        run(&table_without_output),
+        "--output table",
+        &table_without_output,
+    );
+    let catalog = ["--output", "table", "catalog"];
+    assert_rejected(run(&catalog), "always JSON", &catalog);
+    let stream = [
+        "--env",
+        "testnet",
+        "--output",
+        "table",
+        "stream",
+        "subscribe",
+        "ticker.BTC-PERPETUAL.100ms",
+    ];
+    assert_rejected(run(&stream), "JSON Lines", &stream);
 }

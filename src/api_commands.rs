@@ -9,7 +9,8 @@ use crate::api_application::{Call, Failure};
 use crate::commands::parameter_arg;
 use crate::parameters::resolve_parameters;
 use crate::{
-    CliBehavior, Environment, ManifestRegistry, ParameterInput, ParameterType, ValidatedOperation,
+    CliBehavior, CompletionShell, Environment, ManifestRegistry, OutputFormat, ParameterInput,
+    ParameterType, ValidatedOperation,
 };
 
 const NAMED_GROUPS: &[(&str, &str)] = &[
@@ -106,21 +107,42 @@ const PRIVATE_READS: &[PrivateRead] = &[
     },
 ];
 
-pub(crate) fn is_group(name: &str) -> bool {
-    matches!(name, "rpc" | "stream" | "catalog")
-        || NAMED_GROUPS.iter().any(|(group, _)| *group == name)
+pub(crate) struct Display {
+    pub output: OutputFormat,
+    pub table_width: Option<u16>,
+    pub color: crate::ColorPolicy,
 }
 
-pub(crate) fn command(registry: &ManifestRegistry) -> Command {
+pub fn command(registry: &ManifestRegistry) -> Command {
     let mut command = Command::new("deribit-cli")
-        .about("Deribit CLI for public data, authenticated queries and WebSocket operations")
+        .version(env!("CARGO_PKG_VERSION"))
+        .about("Deribit CLI for market data, account queries, and WebSocket operations")
         .after_help(
-            "Network commands require explicit --env mainnet or --env testnet.\n\
-             Compatible commands: public, coverage, version, completion.",
+            "Put --env mainnet or --env testnet before every network command.\n\
+             Help, completion, and catalog stay local and need neither an environment nor credentials.",
         )
         .subcommand_required(true)
         .arg_required_else_help(true)
         .disable_help_subcommand(true)
+        .arg(
+            Arg::new("output")
+                .long("output")
+                .value_parser(["json", "table"])
+                .default_value("json")
+                .help("Render one response as JSON or a table"),
+        )
+        .arg(
+            Arg::new("table-width")
+                .long("table-width")
+                .value_parser(clap::value_parser!(u16).range(20..=240))
+                .help("Set the table width; requires --output table"),
+        )
+        .arg(
+            Arg::new("color")
+                .long("color")
+                .value_parser(["auto", "always", "never"])
+                .help("Color tables; requires --output table"),
+        )
         .arg(
             Arg::new("env")
                 .long("env")
@@ -249,6 +271,50 @@ pub(crate) fn command(registry: &ManifestRegistry) -> Command {
                         .arg(Arg::new("channel").required(true)),
                 ),
         )
+        .subcommand(
+            Command::new("completion")
+                .about("Generate a static shell completion script")
+                .arg(
+                    Arg::new("shell")
+                        .required(true)
+                        .value_parser(["bash", "zsh", "fish"]),
+                ),
+        )
+}
+
+pub(crate) fn display(matches: &ArgMatches) -> Result<Display, Failure> {
+    let output = match matches.get_one::<String>("output").map(String::as_str) {
+        Some("json") => OutputFormat::Json,
+        Some("table") => OutputFormat::Table,
+        _ => unreachable!("output has a parser default"),
+    };
+    let table_width = matches.get_one::<u16>("table-width").copied();
+    let color = match matches.get_one::<String>("color").map(String::as_str) {
+        None => crate::ColorPolicy::Auto,
+        Some("auto") => crate::ColorPolicy::Auto,
+        Some("always") => crate::ColorPolicy::Always,
+        Some("never") => crate::ColorPolicy::Never,
+        _ => unreachable!("color values are restricted"),
+    };
+    if output == OutputFormat::Json && (table_width.is_some() || matches.contains_id("color")) {
+        return Err(Failure::Usage(
+            "--table-width and --color require --output table",
+        ));
+    }
+    Ok(Display {
+        output,
+        table_width,
+        color,
+    })
+}
+
+pub(crate) fn completion_shell(name: &str) -> CompletionShell {
+    match name {
+        "bash" => CompletionShell::Bash,
+        "zsh" => CompletionShell::Zsh,
+        "fish" => CompletionShell::Fish,
+        _ => unreachable!("completion shells are restricted"),
+    }
 }
 
 fn command_group(name: &'static str, help: &'static str) -> Command {
@@ -344,6 +410,9 @@ pub(crate) fn validate_known_parameters(
     registry: &ManifestRegistry,
     call: &Call,
 ) -> Result<(), Failure> {
+    if call.method == "public/auth" {
+        return Ok(());
+    }
     if let Some(operation) = registry
         .operations()
         .find(|row| row.method() == call.method)

@@ -1,8 +1,7 @@
 use std::{ffi::OsStr, path::PathBuf, process::Command};
 
 use deribit_cli::{
-    ManifestRegistry, ParameterInput, ProxyEnvironment, ProxySettings, build_cli,
-    resolve_parameters,
+    ManifestRegistry, ParameterInput, ProxyEnvironment, ProxySettings, resolve_parameters,
 };
 
 fn binary() -> PathBuf {
@@ -39,29 +38,23 @@ fn all_argument_ids(command: &clap::Command) -> Vec<String> {
 fn private_generic_manifest_endpoint_tls_and_expansion_injection_are_rejected() {
     for args in [
         vec!["private", "get-position"],
-        vec!["public", "call", "--method", "public/get_time"],
-        vec!["--method", "public/get_time", "public", "get-time"],
-        vec!["--manifest", "forged.json", "public", "get-time"],
-        vec![
-            "--endpoint",
-            "https://example.invalid",
-            "public",
-            "get-time",
-        ],
-        vec!["--url", "https://example.invalid", "public", "get-time"],
-        vec!["--insecure", "public", "get-time"],
-        vec!["--retry", "2", "public", "get-time"],
-        vec!["--template", "${HOME}", "public", "get-time"],
-        vec!["--include", "params.json", "public", "get-time"],
+        vec!["market", "call", "--method", "public/get_time"],
+        vec!["--method", "public/get_time", "market", "time"],
+        vec!["--manifest", "forged.json", "market", "time"],
+        vec!["--endpoint", "https://example.invalid", "market", "time"],
+        vec!["--url", "https://example.invalid", "market", "time"],
+        vec!["--insecure", "market", "time"],
+        vec!["--retry", "2", "market", "time"],
+        vec!["--template", "${HOME}", "market", "time"],
+        vec!["--include", "params.json", "market", "time"],
         vec!["websocket", "subscribe"],
     ] {
         rejected(args);
     }
 
     let registry = ManifestRegistry::embedded().unwrap();
-    let ids = all_argument_ids(&build_cli(&registry).unwrap());
+    let ids = all_argument_ids(&deribit_cli::product_command(&registry));
     for forbidden in [
-        "method",
         "manifest",
         "endpoint",
         "url",
@@ -79,6 +72,20 @@ fn private_generic_manifest_endpoint_tls_and_expansion_injection_are_rejected() 
             "forbidden argument {forbidden}"
         );
     }
+    let command = deribit_cli::product_command(&registry);
+    let rpc = command
+        .find_subcommand("rpc")
+        .unwrap()
+        .find_subcommand("call")
+        .unwrap();
+    assert!(
+        rpc.get_positionals()
+            .any(|argument| argument.get_id() == "method")
+    );
+    assert!(
+        rpc.get_arguments()
+            .all(|argument| argument.get_id() != "endpoint")
+    );
 }
 
 #[test]
@@ -154,4 +161,9 @@ fn redirect_retry_and_implicit_proxy_discovery_remain_disabled() {
             .operations()
             .all(|operation| operation.is_public_read_only())
     );
+    let source = include_str!("../../src/websocket_transport.rs");
+    let endpoints = include_str!("../../src/configuration.rs");
+    assert!(endpoints.contains("wss://www.deribit.com/ws/api/v2"));
+    assert!(endpoints.contains("wss://test.deribit.com/ws/api/v2"));
+    assert!(source.contains("A connection performs one handshake"));
 }

@@ -182,7 +182,9 @@ mod test_loopback;
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{sync::Mutex, time::Duration};
+
+    static LOOPBACK_TESTS: Mutex<()> = Mutex::new(());
 
     use serde_json::{Map, Value, json};
     use url::Url;
@@ -314,6 +316,7 @@ mod tests {
 
     #[test]
     fn no_retry_no_redirect_no_implicit_pagination() {
+        let _guard = LOOPBACK_TESTS.lock().unwrap();
         let request = order_book_transport_request();
         let transport = ReqwestTransport::new(test_configuration(Duration::from_secs(1), 1024));
 
@@ -372,6 +375,7 @@ mod tests {
 
     #[test]
     fn timeout_and_size_limits() {
+        let _guard = LOOPBACK_TESTS.lock().unwrap();
         let request = order_book_transport_request();
         let timeout_transport =
             ReqwestTransport::new(test_configuration(Duration::from_millis(100), 1024));

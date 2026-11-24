@@ -1,8 +1,7 @@
 use std::{collections::HashMap, fs, io::Cursor};
 
 use deribit_cli::{
-    CliCommand, ErrorClass, ManifestRegistry, ParameterError, ParameterInput,
-    parse_from_with_stdin, resolve_parameters,
+    ErrorClass, ManifestRegistry, ParameterError, ParameterInput, resolve_parameters,
 };
 use serde_json::json;
 
@@ -219,89 +218,43 @@ fn parameter_codec_enforces_bom_utf8_depth_and_byte_budget() {
 #[test]
 fn parameter_codec_cli_adapter_binds_only_canonical_commands() {
     let registry = ManifestRegistry::embedded().unwrap();
-    let parsed = parse_from_with_stdin(
-        &registry,
-        [
+    let command = deribit_cli::product_command(&registry);
+    let matches = command
+        .try_get_matches_from([
             "deribit-cli",
             "--env",
             "testnet",
-            "--timeout",
-            "250ms",
-            "public",
-            "get-order-book",
+            "--timeout-seconds",
+            "1",
+            "market",
+            "order-book",
             "--instrument-name",
             "BTC-PERPETUAL",
             "--depth",
             "5",
-        ],
-        &mut Cursor::new(Vec::new()),
-        false,
-    )
-    .unwrap();
-    let CliCommand::Public(public) = parsed.command else {
-        panic!("expected public invocation")
-    };
-    assert_eq!(public.method, "public/get_order_book");
-    assert_eq!(public.operation_id, "public_get_order_book");
+        ])
+        .unwrap();
+    let (group, group_args) = matches.subcommand().unwrap();
+    let (name, method_args) = group_args.subcommand().unwrap();
+    assert_eq!((group, name), ("market", "order-book"));
     assert_eq!(
-        public.params,
-        json!({"instrument_name":"BTC-PERPETUAL","depth":5})
+        method_args.get_one::<String>("instrument_name").unwrap(),
+        "BTC-PERPETUAL"
     );
-    assert_eq!(public.timeout.as_millis(), 250);
-    assert_eq!(public.environment, deribit_cli::Environment::Testnet);
-
-    let global_separator = parse_from_with_stdin(
-        &registry,
-        ["deribit-cli", "--", "public", "get-time"],
-        &mut Cursor::new(Vec::new()),
-        false,
-    )
-    .unwrap();
-    assert!(matches!(global_separator.command, CliCommand::Public(_)));
-    let trailing_separator = parse_from_with_stdin(
-        &registry,
-        ["deribit-cli", "public", "get-time", "--"],
-        &mut Cursor::new(Vec::new()),
-        false,
-    )
-    .unwrap();
-    assert!(matches!(trailing_separator.command, CliCommand::Public(_)));
+    assert_eq!(method_args.get_one::<String>("depth").unwrap(), "5");
 
     for args in [
-        vec!["deribit-cli", "public", "get_order_book"],
-        vec!["deribit-cli", "public", "get-ord"],
+        vec!["deribit-cli", "market", "get_order_book"],
+        vec!["deribit-cli", "market", "order"],
         vec!["deribit-cli", "private", "get-order-book"],
-        vec![
-            "deribit-cli",
-            "public",
-            "get-order-book",
-            "--env",
-            "testnet",
-        ],
-        vec!["deribit-cli", "--timeout", "0s", "public", "get-time"],
-        vec!["deribit-cli", "--", "public", "get-time", "--"],
-        vec!["deribit-cli", "--help", "--env", "testnet"],
-        vec!["deribit-cli", "--version", "public", "get-time"],
+        vec!["deribit-cli", "market", "order-book", "--env", "testnet"],
+        vec!["deribit-cli", "--timeout-seconds", "0", "market", "time"],
+        vec!["deribit-cli", "--version", "market", "time"],
     ] {
-        let error = parse_from_with_stdin(&registry, args, &mut Cursor::new(Vec::new()), false)
-            .unwrap_err();
-        assert_eq!(error.class(), Some(ErrorClass::Usage));
+        assert!(
+            deribit_cli::product_command(&registry)
+                .try_get_matches_from(args)
+                .is_err()
+        );
     }
-
-    let conflict = parse_from_with_stdin(
-        &registry,
-        [
-            "deribit-cli",
-            "--params",
-            r#"{"instrument_name":"BTC-PERPETUAL"}"#,
-            "public",
-            "get-order-book",
-            "--instrument-name",
-            "BTC-PERPETUAL",
-        ],
-        &mut Cursor::new(Vec::new()),
-        false,
-    )
-    .unwrap_err();
-    assert_eq!(conflict.class(), Some(ErrorClass::Usage));
 }

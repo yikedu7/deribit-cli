@@ -28,7 +28,6 @@ impl Environment {
         }
     }
 
-    #[cfg(feature = "general-api")]
     pub(crate) const fn websocket_endpoint(self) -> &'static str {
         match self {
             Self::Mainnet => "wss://www.deribit.com/ws/api/v2",
