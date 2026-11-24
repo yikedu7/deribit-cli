@@ -66,7 +66,7 @@ fn product_binary_local_commands_and_completion_are_snapshot_bound() {
     assert_process(&version, 0, false, true);
     assert_eq!(
         version.stdout,
-        b"deribit-cli 0.1.0
+        b"deribit-cli 0.2.0
 "
     );
 

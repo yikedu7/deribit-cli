@@ -2,6 +2,8 @@
 
 A Rust CLI for Deribit market data, account queries, exact JSON-RPC calls, and WebSocket subscriptions.
 
+Current release: v0.2.0. Download the archive for your platform and `SHA256SUMS` from the [GitHub Release](https://github.com/yikedu7/deribit-cli/releases/tag/v0.2.0). Supported targets are macOS Apple Silicon and Intel, Linux x86-64 and ARM64, and Windows x86-64.
+
 The current source build uses one command tree. Named commands and `rpc call` create the same call plan, then share permission checks and one WebSocket execution path. `catalog` and shell completion stay local.
 
 ## Install from source
